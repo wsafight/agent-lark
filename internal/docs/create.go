@@ -1,0 +1,85 @@
+package docs
+
+import (
+	"fmt"
+
+	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
+	"github.com/spf13/cobra"
+	"github.com/wangshian/agent-lark/internal/client"
+	"github.com/wangshian/agent-lark/internal/output"
+)
+
+func newCreateCommand() *cobra.Command {
+	var title string
+	var folder string
+
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "创建新文档",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
+			if agent {
+				output.GlobalAgent = true
+			}
+
+			if title == "" {
+				return fmt.Errorf("MISSING_FLAG：--title 是必填项")
+			}
+
+			c, err := client.New(client.Options{
+				TokenMode: tokenMode,
+				Debug:     debug,
+				Profile:   profile,
+				Config:    cfg,
+				Domain:    domain,
+			})
+			if err != nil {
+				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+			}
+
+			builder := larkdocx.NewCreateDocumentReqBodyBuilder().
+				Title(title)
+
+			if folder != "" {
+				folderToken := ExtractFolderToken(folder)
+				if folderToken != "" {
+					builder = builder.FolderToken(folderToken)
+				}
+			}
+
+			req := larkdocx.NewCreateDocumentReqBuilder().
+				Body(builder.Build()).
+				Build()
+
+			resp, err := c.Client.Docx.Document.Create(cmd.Context(), req, c.RequestOptions()...)
+			if err != nil {
+				return fmt.Errorf("API_ERROR：%s", err.Error())
+			}
+			if !resp.Success() {
+				return fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
+			}
+
+			docToken := ""
+			if resp.Data.Document != nil && resp.Data.Document.DocumentId != nil {
+				docToken = *resp.Data.Document.DocumentId
+			}
+
+			docURL := fmt.Sprintf("https://feishu.cn/docx/%s", docToken)
+			output.PrintSuccess(quiet, fmt.Sprintf("文档已创建：%s", docURL))
+
+			if output.GlobalAgent {
+				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{
+					"document_id": docToken,
+					"url":         docURL,
+				})
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&title, "title", "", "文档标题（必填）")
+	cmd.Flags().StringVar(&folder, "folder", "", "目标文件夹 URL 或 token")
+
+	return cmd
+}

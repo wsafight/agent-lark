@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+
+# Go binaries and build outputs
+agent-lark
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Coverage
+coverage.out
+*.coverprofile
+
+# Build directories
+bin/
+build/
+dist/
+
+# Logs and temp files
+*.log
+tmp/
+temp/
+
+# Environment files
+.env
+.env.*
+
+# Editor / IDE
+.idea/
+.vscode/
