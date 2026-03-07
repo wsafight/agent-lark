@@ -9,7 +9,7 @@ func NewCommand() *cobra.Command {
 	chats.AddCommand(newChatsListCommand(), newChatsSearchCommand())
 
 	messages := &cobra.Command{Use: "messages", Short: "消息管理"}
-	messages.AddCommand(newMessagesListCommand())
+	messages.AddCommand(newMessagesListCommand(), newMessagesGetCommand())
 
 	react := &cobra.Command{Use: "react", Short: "表情回复"}
 	react.AddCommand(newReactAddCommand(), newReactRemoveCommand())

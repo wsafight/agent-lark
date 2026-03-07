@@ -8,9 +8,9 @@ import (
 
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/docs"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/docs"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newReplyCommand() *cobra.Command {

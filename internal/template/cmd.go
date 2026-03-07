@@ -9,22 +9,15 @@ import (
 
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/docs"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
+	"github.com/wsafight/agent-lark/internal/docs"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func getGlobalFlags(cmd *cobra.Command) (format, tokenMode, profile, config, domain string, debug, quiet, agent bool) {
-	root := cmd.Root()
-	format, _ = root.PersistentFlags().GetString("format")
-	tokenMode, _ = root.PersistentFlags().GetString("token-mode")
-	profile, _ = root.PersistentFlags().GetString("profile")
-	config, _ = root.PersistentFlags().GetString("config")
-	domain, _ = root.PersistentFlags().GetString("domain")
-	debug, _ = root.PersistentFlags().GetBool("debug")
-	quiet, _ = root.PersistentFlags().GetBool("quiet")
-	agent, _ = root.PersistentFlags().GetBool("agent")
-	return
+	g := cmdutil.GetGlobalFlags(cmd)
+	return g.Format, g.TokenMode, g.Profile, g.Config, g.Domain, g.Debug, g.Quiet, g.Agent
 }
 
 // NewCommand returns the template subcommand group.
@@ -463,10 +456,11 @@ func newTemplateDeleteCommand() *cobra.Command {
 				output.GlobalAgent = true
 			}
 			_ = quiet
+			globalYes, _ := cmd.Root().PersistentFlags().GetBool("yes")
 
 			name := args[0]
 
-			if !yes && !output.GlobalAgent {
+			if !yes && !globalYes && !output.GlobalAgent {
 				fmt.Printf("确认删除模板 %q？[y/N]: ", name)
 				var input string
 				fmt.Scan(&input)
@@ -515,6 +509,9 @@ func newTemplateApplyCommand() *cobra.Command {
 			}
 			if newDoc && title == "" {
 				return fmt.Errorf("MISSING_FLAG：--new 时需要提供 --title")
+			}
+			if after != "" && before != "" {
+				return fmt.Errorf("INVALID_FLAGS：--after 和 --before 不能同时使用")
 			}
 
 			// Parse custom vars

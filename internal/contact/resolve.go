@@ -6,8 +6,8 @@ import (
 
 	larkcontact "github.com/larksuite/oapi-sdk-go/v3/service/contact/v3"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newResolveCommand() *cobra.Command {
@@ -63,8 +63,7 @@ func newResolveCommand() *cobra.Command {
 			}
 
 			if openID == "" {
-				output.PrintErrorCode("NOT_FOUND", fmt.Sprintf("未找到邮箱 %q 对应的用户", input), "")
-				return fmt.Errorf("NOT_FOUND：未找到用户")
+				return fmt.Errorf("NOT_FOUND：未找到邮箱 %q 对应的用户", input)
 			}
 
 			fmt.Println(openID)

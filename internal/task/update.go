@@ -3,11 +3,13 @@ package task
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 
 	larktask "github.com/larksuite/oapi-sdk-go/v3/service/task/v2"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newUpdateCommand() *cobra.Command {
@@ -31,6 +33,14 @@ func newUpdateCommand() *cobra.Command {
 			if taskID == "" {
 				return fmt.Errorf("MISSING_FLAG：--task-id 为必填项")
 			}
+			normalizedStatus, err := normalizeTaskStatus(status)
+			if err != nil {
+				return err
+			}
+			status = normalizedStatus
+			if title == "" && due == "" && status == "" {
+				return fmt.Errorf("MISSING_FLAG：至少提供 --title / --due / --status 之一")
+			}
 
 			c, err := client.New(client.Options{
 				TokenMode: tokenMode,
@@ -53,8 +63,12 @@ func newUpdateCommand() *cobra.Command {
 			}
 
 			if due != "" {
+				dueMillis, err := parseDueToMillis(due)
+				if err != nil {
+					return fmt.Errorf("INVALID_DUE：%s", err.Error())
+				}
 				dueObj := larktask.NewDueBuilder().
-					Timestamp(due).
+					Timestamp(dueMillis).
 					IsAllDay(true).
 					Build()
 				taskBuilder = taskBuilder.Due(dueObj)
@@ -62,10 +76,11 @@ func newUpdateCommand() *cobra.Command {
 			}
 
 			if status == "done" {
-				// To mark as done, we complete the task. The patch API handles this via completed_at.
-				// We'll use the summary field and rely on the status update path.
-				// For the task v2 API, completion is indicated by setting completed_at.
-				updateFields = append(updateFields, "status")
+				taskBuilder = taskBuilder.CompletedAt(strconv.FormatInt(time.Now().UnixMilli(), 10))
+				updateFields = append(updateFields, "completed_at")
+			} else if status == "todo" {
+				taskBuilder = taskBuilder.CompletedAt("0")
+				updateFields = append(updateFields, "completed_at")
 			}
 
 			req := larktask.NewPatchTaskReqBuilder().
@@ -100,8 +115,8 @@ func newUpdateCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&taskID, "task-id", "", "任务 ID（必填）")
-	cmd.Flags().StringVar(&status, "status", "", "任务状态：done|todo|in_progress")
+	cmd.Flags().StringVar(&status, "status", "", "任务状态：todo|done")
 	cmd.Flags().StringVar(&title, "title", "", "新标题")
-	cmd.Flags().StringVar(&due, "due", "", "截止日期（如 2024-12-31）")
+	cmd.Flags().StringVar(&due, "due", "", "截止时间（支持 YYYY-MM-DD / RFC3339 / Unix 秒或毫秒）")
 	return cmd
 }

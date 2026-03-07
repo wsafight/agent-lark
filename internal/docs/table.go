@@ -9,8 +9,8 @@ import (
 
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newTableCommand() *cobra.Command {
@@ -77,29 +77,31 @@ func newTableCommand() *cobra.Command {
 			if keyword != "" {
 				kw := strings.ToLower(keyword)
 				for i, b := range outBlocks {
-					text := strings.ToLower(b.TextContent())
+					content := b.TextContent()
+					text := strings.ToLower(content)
 					if strings.Contains(text, kw) {
 						matches = append(matches, Match{
 							Index:   i,
 							BlockID: b.BlockID,
-							Text:    b.TextContent(),
+							Text:    content,
 						})
 					}
 				}
 
 				if len(matches) > 1 && matchIndex < 0 {
 					if format == "json" {
-						return output.PrintJSON(os.Stdout, map[string]any{
+						_ = output.PrintJSON(os.Stdout, map[string]any{
 							"error":   "AMBIGUOUS_MATCH",
 							"message": fmt.Sprintf("找到 %d 个匹配段落，请用 --match-index 指定", len(matches)),
 							"matches": matches,
 						})
+						return fmt.Errorf("AMBIGUOUS_MATCH：找到 %d 个匹配段落，请用 --match-index 指定", len(matches))
 					}
 					fmt.Fprintf(os.Stderr, "[ERROR] AMBIGUOUS_MATCH: 找到 %d 个匹配段落，请用 --match-index 指定\n", len(matches))
 					for i, m := range matches {
 						fmt.Fprintf(os.Stderr, "  [%d] block_id=%s text=%q\n", i, m.BlockID, m.Text)
 					}
-					return nil
+					return fmt.Errorf("AMBIGUOUS_MATCH：找到 %d 个匹配段落，请用 --match-index 指定", len(matches))
 				}
 
 				if len(matches) == 0 {
@@ -161,18 +163,21 @@ func newTableCommand() *cobra.Command {
 			if headers && len(tableData) == 0 {
 				rows++ // add a header row
 			}
+			if rows <= 0 || cols <= 0 {
+				return fmt.Errorf("INVALID_TABLE_SIZE：行列必须大于 0")
+			}
 
 			if dryRun {
 				preview := map[string]any{
-					"action":         "insert_table",
-					"document_id":    docToken,
-					"insert_after":   after,
-					"insert_before":  before,
+					"action":          "insert_table",
+					"document_id":     docToken,
+					"insert_after":    after,
+					"insert_before":   before,
 					"insert_block_id": insertBlockID,
-					"insert_index":   insertIndex,
-					"rows":           rows,
-					"cols":           cols,
-					"headers":        headers,
+					"insert_index":    insertIndex,
+					"rows":            rows,
+					"cols":            cols,
+					"headers":         headers,
 				}
 				if len(tableData) > 0 {
 					preview["data"] = tableData
@@ -183,8 +188,18 @@ func newTableCommand() *cobra.Command {
 
 			// Build table block
 			tableBlockType := 31
+			table := larkdocx.NewTableBuilder().
+				Property(
+					larkdocx.NewTablePropertyBuilder().
+						RowSize(rows).
+						ColumnSize(cols).
+						HeaderRow(headers).
+						Build(),
+				).
+				Build()
 			block := larkdocx.NewBlockBuilder().
 				BlockType(tableBlockType).
+				Table(table).
 				Build()
 
 			reqBody := larkdocx.NewCreateDocumentBlockChildrenReqBodyBuilder().
@@ -204,6 +219,30 @@ func newTableCommand() *cobra.Command {
 			}
 			if !resp.Success() {
 				return fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
+			}
+
+			// Fill table cell text when data is provided.
+			if len(tableData) > 0 && len(resp.Data.Children) > 0 {
+				tableBlock := resp.Data.Children[0]
+				if tableBlock != nil && tableBlock.Table != nil && len(tableBlock.Table.Cells) > 0 {
+					for r := 0; r < rows && r < len(tableData); r++ {
+						row := tableData[r]
+						for cidx := 0; cidx < cols && cidx < len(row); cidx++ {
+							text := strings.TrimSpace(row[cidx])
+							if text == "" {
+								continue
+							}
+							cellIndex := r*cols + cidx
+							if cellIndex >= len(tableBlock.Table.Cells) {
+								continue
+							}
+							cellID := tableBlock.Table.Cells[cellIndex]
+							if err := appendTextToTableCell(cmd, c, docToken, cellID, text); err != nil {
+								return err
+							}
+						}
+					}
+				}
 			}
 
 			output.PrintSuccess(quiet, fmt.Sprintf("表格已插入文档 %s（%d 行 × %d 列）", docToken, rows, cols))
@@ -231,4 +270,40 @@ func newTableCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "只预览，不实际写入")
 
 	return cmd
+}
+
+func appendTextToTableCell(cmd *cobra.Command, c *client.Result, docToken, cellID, text string) error {
+	textRun := larkdocx.NewTextRunBuilder().
+		Content(text).
+		Build()
+	element := larkdocx.NewTextElementBuilder().
+		TextRun(textRun).
+		Build()
+	textBlock := larkdocx.NewTextBuilder().
+		Elements([]*larkdocx.TextElement{element}).
+		Build()
+	block := larkdocx.NewBlockBuilder().
+		BlockType(2).
+		Text(textBlock).
+		Build()
+
+	req := larkdocx.NewCreateDocumentBlockChildrenReqBuilder().
+		DocumentId(docToken).
+		BlockId(cellID).
+		Body(
+			larkdocx.NewCreateDocumentBlockChildrenReqBodyBuilder().
+				Children([]*larkdocx.Block{block}).
+				Index(-1).
+				Build(),
+		).
+		Build()
+
+	resp, err := c.Client.Docx.DocumentBlockChildren.Create(cmd.Context(), req, c.RequestOptions()...)
+	if err != nil {
+		return fmt.Errorf("API_ERROR：%s", err.Error())
+	}
+	if !resp.Success() {
+		return fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
+	}
+	return nil
 }

@@ -1,4 +1,4 @@
-module github.com/wangshian/agent-lark
+module github.com/wsafight/agent-lark
 
 go 1.22
 

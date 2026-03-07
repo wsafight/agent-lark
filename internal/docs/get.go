@@ -7,8 +7,9 @@ import (
 
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/docxutil"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newGetCommand() *cobra.Command {
@@ -107,7 +108,7 @@ func newGetCommand() *cobra.Command {
 					BlockType int    `json:"block_type"`
 					Text      string `json:"text"`
 				}
-				var jBlocks []jsonBlock
+				jBlocks := make([]jsonBlock, 0, len(outBlocks))
 				for _, b := range outBlocks {
 					jBlocks = append(jBlocks, jsonBlock{
 						BlockID:   b.BlockID,
@@ -136,133 +137,12 @@ func newGetCommand() *cobra.Command {
 
 // fetchAllBlocks fetches all document blocks with pagination.
 func fetchAllBlocks(cmd *cobra.Command, c *client.Result, docToken string) ([]*larkdocx.Block, error) {
-	ctx := cmd.Context()
-
-	var allBlocks []*larkdocx.Block
-	var pageToken string
-
-	for {
-		builder := larkdocx.NewListDocumentBlockReqBuilder().
-			DocumentId(docToken).
-			PageSize(200)
-		if pageToken != "" {
-			builder = builder.PageToken(pageToken)
-		}
-
-		resp, err := c.Client.Docx.DocumentBlock.List(
-			ctx,
-			builder.Build(),
-			c.RequestOptions()...,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("API_ERROR：%s", err.Error())
-		}
-		if !resp.Success() {
-			return nil, fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
-		}
-
-		allBlocks = append(allBlocks, resp.Data.Items...)
-
-		hasMore := resp.Data.HasMore != nil && *resp.Data.HasMore
-		if !hasMore {
-			break
-		}
-		if resp.Data.PageToken == nil || *resp.Data.PageToken == "" {
-			break
-		}
-		pageToken = *resp.Data.PageToken
-	}
-
-	return allBlocks, nil
+	return docxutil.FetchAllBlocks(cmd.Context(), c, docToken)
 }
 
 // convertBlocks converts larkdocx blocks to output.BlockItem.
 func convertBlocks(blocks []*larkdocx.Block) []*output.BlockItem {
-	var result []*output.BlockItem
-	for _, b := range blocks {
-		if b == nil {
-			continue
-		}
-		item := &output.BlockItem{}
-		if b.BlockId != nil {
-			item.BlockID = *b.BlockId
-		}
-		if b.BlockType != nil {
-			item.BlockType = *b.BlockType
-		}
-		texts := extractTextsFromBlock(b)
-		item.Texts = texts
-		result = append(result, item)
-	}
-	return result
-}
-
-func extractTextsFromBlock(b *larkdocx.Block) []string {
-	if b == nil || b.BlockType == nil {
-		return nil
-	}
-	bt := *b.BlockType
-
-	extractFromElements := func(elements []*larkdocx.TextElement) []string {
-		var texts []string
-		for _, el := range elements {
-			if el == nil {
-				continue
-			}
-			if el.TextRun != nil && el.TextRun.Content != nil {
-				texts = append(texts, *el.TextRun.Content)
-			}
-		}
-		return texts
-	}
-
-	switch bt {
-	case 2: // text
-		if b.Text != nil && b.Text.Elements != nil {
-			return extractFromElements(b.Text.Elements)
-		}
-	case 3: // heading1
-		if b.Heading1 != nil && b.Heading1.Elements != nil {
-			return extractFromElements(b.Heading1.Elements)
-		}
-	case 4: // heading2
-		if b.Heading2 != nil && b.Heading2.Elements != nil {
-			return extractFromElements(b.Heading2.Elements)
-		}
-	case 5: // heading3
-		if b.Heading3 != nil && b.Heading3.Elements != nil {
-			return extractFromElements(b.Heading3.Elements)
-		}
-	case 6: // heading4
-		if b.Heading4 != nil && b.Heading4.Elements != nil {
-			return extractFromElements(b.Heading4.Elements)
-		}
-	case 7: // heading5
-		if b.Heading5 != nil && b.Heading5.Elements != nil {
-			return extractFromElements(b.Heading5.Elements)
-		}
-	case 8: // heading6
-		if b.Heading6 != nil && b.Heading6.Elements != nil {
-			return extractFromElements(b.Heading6.Elements)
-		}
-	case 9: // ordered_list
-		if b.Ordered != nil && b.Ordered.Elements != nil {
-			return extractFromElements(b.Ordered.Elements)
-		}
-	case 10: // bullet
-		if b.Bullet != nil && b.Bullet.Elements != nil {
-			return extractFromElements(b.Bullet.Elements)
-		}
-	case 11: // code
-		if b.Code != nil && b.Code.Elements != nil {
-			return extractFromElements(b.Code.Elements)
-		}
-	case 12: // quote
-		if b.Quote != nil && b.Quote.Elements != nil {
-			return extractFromElements(b.Quote.Elements)
-		}
-	}
-	return nil
+	return docxutil.ConvertBlocks(blocks)
 }
 
 // filterSection returns blocks under a heading matching the keyword.

@@ -1,15 +1,14 @@
 package doctor
 
 import (
-	"context"
 	"fmt"
-	"net/http"
+	"net"
 	"os"
+	"strings"
 	"time"
 
-	lark "github.com/larksuite/oapi-sdk-go/v3"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/auth"
+	"github.com/wsafight/agent-lark/internal/auth"
 )
 
 func NewCommand() *cobra.Command {
@@ -47,25 +46,24 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// 3. 验证应用凭据
-	client := lark.NewClient(cfg.AppID, cfg.AppSecret)
-	resp, err := client.Auth.TenantAccessToken.Internal(context.Background(), nil)
-	if err != nil || !resp.Success() {
-		fail("应用凭据无效  "+cfg.AppID, "检查 App ID 和 App Secret 是否正确")
+	domain := normalizeDomain(cfg.Domain)
+	if err := auth.ValidateAppCredentials(cfg.AppID, cfg.AppSecret, domain); err != nil {
+		fail("应用凭据无效  "+cfg.AppID, err.Error())
 		return nil
 	}
 	ok("应用凭据有效          " + cfg.AppID)
 
-	// 4. 检查 API 连通性
-	domain := "open.feishu.cn"
-	if cfg.Domain != "" {
-		domain = cfg.Domain
+	// 4. 检查 API 连通性（直接检查到 OpenAPI 域名 443 的 TCP 连通）
+	if domain == "" {
+		domain = "open.feishu.cn"
 	}
 	start := time.Now()
-	httpResp, err := http.Get("https://" + domain + "/open-apis/auth/v3/tenant_access_token/internal")
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(domain, "443"), 5*time.Second)
 	latency := time.Since(start)
-	if err != nil || httpResp.StatusCode >= 500 {
+	if err != nil {
 		fail("API 连通性检查失败  "+domain, "检查网络连接")
 	} else {
+		_ = conn.Close()
 		ok(fmt.Sprintf("API 连通性正常        %s 延迟 %dms", domain, latency.Milliseconds()))
 	}
 
@@ -83,4 +81,15 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func normalizeDomain(domain string) string {
+	d := strings.TrimSpace(domain)
+	d = strings.TrimPrefix(d, "https://")
+	d = strings.TrimPrefix(d, "http://")
+	d = strings.TrimSuffix(d, "/")
+	if i := strings.Index(d, "/"); i >= 0 {
+		d = d[:i]
+	}
+	return d
 }

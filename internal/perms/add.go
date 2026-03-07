@@ -8,14 +8,15 @@ import (
 
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newAddCommand() *cobra.Command {
 	var users []string
 	var role string
 	var noNotify bool
+	var strict bool
 
 	cmd := &cobra.Command{
 		Use:   "add <URL>",
@@ -53,6 +54,7 @@ func newAddCommand() *cobra.Command {
 				Error  string `json:"error,omitempty"`
 			}
 			var results []addResult
+			failedCount := 0
 
 			for _, user := range users {
 				memberType := "email"
@@ -83,17 +85,25 @@ func newAddCommand() *cobra.Command {
 				)
 				if err != nil {
 					results = append(results, addResult{User: user, Status: "failed", Error: err.Error()})
+					failedCount++
 					continue
 				}
 				if !resp.Success() {
 					results = append(results, addResult{User: user, Status: "failed", Error: fmt.Sprintf("[%d] %s", resp.Code, resp.Msg)})
+					failedCount++
 					continue
 				}
 				results = append(results, addResult{User: user, Status: "succeeded"})
 			}
 
 			if format == "json" {
-				return output.PrintJSON(os.Stdout, results)
+				if err := output.PrintJSON(os.Stdout, results); err != nil {
+					return err
+				}
+				if strict && failedCount > 0 {
+					return fmt.Errorf("PARTIAL_FAILURE：%d 个成员添加失败", failedCount)
+				}
+				return nil
 			}
 
 			for _, r := range results {
@@ -103,6 +113,9 @@ func newAddCommand() *cobra.Command {
 					fmt.Printf("✗ 添加 %s 失败：%s\n", r.User, r.Error)
 				}
 			}
+			if strict && failedCount > 0 {
+				return fmt.Errorf("PARTIAL_FAILURE：%d 个成员添加失败", failedCount)
+			}
 			return nil
 		},
 	}
@@ -110,5 +123,6 @@ func newAddCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&users, "user", nil, "成员（可重复，邮箱或 open_id）")
 	cmd.Flags().StringVar(&role, "role", "view", "权限级别：view|edit|full_access")
 	cmd.Flags().BoolVar(&noNotify, "no-notify", false, "不发送通知")
+	cmd.Flags().BoolVar(&strict, "strict", false, "任一用户失败时返回非零退出码")
 	return cmd
 }

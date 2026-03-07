@@ -6,16 +6,16 @@ import (
 
 	larktask "github.com/larksuite/oapi-sdk-go/v3/service/task/v2"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 type taskItem struct {
-	TaskID      string `json:"task_id"`
-	Title       string `json:"title"`
-	Status      string `json:"status"`
-	Due         string `json:"due,omitempty"`
-	AssigneeID  string `json:"assignee_id,omitempty"`
+	TaskID     string `json:"task_id"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	Due        string `json:"due,omitempty"`
+	AssigneeID string `json:"assignee_id,omitempty"`
 }
 
 func newListCommand() *cobra.Command {
@@ -35,6 +35,12 @@ func newListCommand() *cobra.Command {
 			format = output.FormatFromCmd(format)
 			_ = quiet
 
+			normalizedStatus, err := normalizeTaskStatus(status)
+			if err != nil {
+				return err
+			}
+			status = normalizedStatus
+
 			c, err := client.New(client.Options{
 				TokenMode: tokenMode,
 				Debug:     debug,
@@ -46,60 +52,92 @@ func newListCommand() *cobra.Command {
 				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
 			}
 
-			reqBuilder := larktask.NewListTaskReqBuilder().
-				PageSize(limit)
-
-			if assignee != "" {
-				reqBuilder = reqBuilder.UserIdType("open_id")
+			pageSize := limit
+			if pageSize <= 0 || pageSize > 100 {
+				pageSize = 100
 			}
-
-			req := reqBuilder.Build()
-
-			resp, err := c.Client.Task.V2.Task.List(cmd.Context(), req, c.RequestOptions()...)
-			if err != nil {
-				return fmt.Errorf("API_ERROR：%s", err.Error())
-			}
-			if !resp.Success() {
-				return fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
+			if limit <= 0 {
+				limit = 20
 			}
 
 			var items []taskItem
-			for _, t := range resp.Data.Items {
-				item := taskItem{}
-				if t.Guid != nil {
-					item.TaskID = *t.Guid
+			pageToken := ""
+			for {
+				reqBuilder := larktask.NewListTaskReqBuilder().
+					PageSize(pageSize).
+					UserIdType("open_id")
+
+				if status == "done" {
+					reqBuilder = reqBuilder.Completed(true)
+				} else if status == "todo" {
+					reqBuilder = reqBuilder.Completed(false)
 				}
-				if t.Summary != nil {
-					item.Title = *t.Summary
+				if pageToken != "" {
+					reqBuilder = reqBuilder.PageToken(pageToken)
 				}
-				if t.CompletedAt != nil && *t.CompletedAt != "" {
-					item.Status = "done"
-				} else {
-					item.Status = "todo"
+
+				resp, err := c.Client.Task.V2.Task.List(cmd.Context(), reqBuilder.Build(), c.RequestOptions()...)
+				if err != nil {
+					return fmt.Errorf("API_ERROR：%s", err.Error())
 				}
-				if t.Due != nil && t.Due.Timestamp != nil {
-					item.Due = *t.Due.Timestamp
+				if !resp.Success() {
+					return fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
 				}
-				if len(t.Members) > 0 {
-					for _, m := range t.Members {
-						if m.Id != nil {
-							item.AssigneeID = *m.Id
-							break
+
+				for _, t := range resp.Data.Items {
+					item := taskItem{}
+					if t.Guid != nil {
+						item.TaskID = *t.Guid
+					}
+					if t.Summary != nil {
+						item.Title = *t.Summary
+					}
+					completedAt := ""
+					if t.CompletedAt != nil {
+						completedAt = *t.CompletedAt
+					}
+					if t.Status != nil {
+						item.Status = deriveTaskStatus(*t.Status, completedAt)
+					} else {
+						item.Status = deriveTaskStatus("", completedAt)
+					}
+					if t.Due != nil && t.Due.Timestamp != nil {
+						item.Due = *t.Due.Timestamp
+					}
+					if len(t.Members) > 0 {
+						for _, m := range t.Members {
+							if m.Id != nil {
+								item.AssigneeID = *m.Id
+								break
+							}
 						}
+					}
+
+					if assignee != "" && item.AssigneeID != assignee {
+						continue
+					}
+					if status != "" && item.Status != status {
+						continue
+					}
+
+					items = append(items, item)
+					if len(items) >= limit {
+						break
 					}
 				}
 
-				// Filter by assignee if specified
-				if assignee != "" && item.AssigneeID != assignee {
-					continue
+				if len(items) >= limit {
+					break
 				}
-
-				// Filter by status if specified
-				if status != "" && item.Status != status {
-					continue
+				hasMore := resp.Data.HasMore != nil && *resp.Data.HasMore
+				nextPage := ""
+				if resp.Data.PageToken != nil {
+					nextPage = *resp.Data.PageToken
 				}
-
-				items = append(items, item)
+				if !hasMore || nextPage == "" {
+					break
+				}
+				pageToken = nextPage
 			}
 
 			if format == "json" {
@@ -118,7 +156,7 @@ func newListCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&assignee, "assignee", "", "负责人 open_id")
-	cmd.Flags().StringVar(&status, "status", "", "任务状态：todo|in_progress|done")
+	cmd.Flags().StringVar(&status, "status", "", "任务状态：todo|done")
 	cmd.Flags().IntVar(&limit, "limit", 20, "返回数量限制")
 	return cmd
 }

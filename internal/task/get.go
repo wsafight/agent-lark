@@ -6,8 +6,8 @@ import (
 
 	larktask "github.com/larksuite/oapi-sdk-go/v3/service/task/v2"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newGetCommand() *cobra.Command {
@@ -74,10 +74,14 @@ func newGetCommand() *cobra.Command {
 				if t.Description != nil {
 					detail.Description = *t.Description
 				}
-				if t.CompletedAt != nil && *t.CompletedAt != "" {
-					detail.Status = "done"
+				completedAt := ""
+				if t.CompletedAt != nil {
+					completedAt = *t.CompletedAt
+				}
+				if t.Status != nil {
+					detail.Status = deriveTaskStatus(*t.Status, completedAt)
 				} else {
-					detail.Status = "todo"
+					detail.Status = deriveTaskStatus("", completedAt)
 				}
 				if t.Due != nil && t.Due.Timestamp != nil {
 					detail.Due = *t.Due.Timestamp

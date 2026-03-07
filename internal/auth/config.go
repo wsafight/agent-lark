@@ -48,7 +48,7 @@ func ResolveConfigPath(explicitConfig, profile string) string {
 	if explicitConfig != "" {
 		return explicitConfig
 	}
-	return ProfileConfigPath(profile)
+	return ProfileConfigPath(ResolveEffectiveProfile(profile))
 }
 
 func Load(explicitConfig, profile string) (*Config, string, error) {

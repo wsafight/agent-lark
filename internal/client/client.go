@@ -6,7 +6,7 @@ import (
 
 	lark "github.com/larksuite/oapi-sdk-go/v3"
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
-	"github.com/wangshian/agent-lark/internal/auth"
+	"github.com/wsafight/agent-lark/internal/auth"
 )
 
 type Options struct {
@@ -70,8 +70,15 @@ func buildResult(cfg *auth.Config, opts Options) (*Result, error) {
 	var userToken string
 	if mode == "auto" || mode == "user" {
 		if cfg.UserSession != nil && cfg.UserSession.UserAccessToken != "" {
-			userToken = cfg.UserSession.UserAccessToken
-			mode = "user"
+			if err := auth.EnsureUserTokenValid(cfg, opts.Config, opts.Profile); err != nil {
+				if mode == "user" {
+					return nil, err
+				}
+				mode = "tenant"
+			} else {
+				userToken = cfg.UserSession.UserAccessToken
+				mode = "user"
+			}
 		} else if mode == "user" {
 			return nil, fmt.Errorf("TOKEN_EXPIRED：用户 Token 不存在或已过期，请运行 'agent-lark auth oauth'")
 		} else {

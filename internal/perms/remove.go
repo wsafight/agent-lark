@@ -7,8 +7,8 @@ import (
 
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newRemoveCommand() *cobra.Command {
@@ -25,6 +25,7 @@ func newRemoveCommand() *cobra.Command {
 				output.GlobalAgent = true
 			}
 			_ = quiet
+			globalYes, _ := cmd.Root().PersistentFlags().GetBool("yes")
 
 			if user == "" {
 				return fmt.Errorf("MISSING_FLAG：--user 为必填项")
@@ -43,7 +44,7 @@ func newRemoveCommand() *cobra.Command {
 				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
 			}
 
-			if !yes && !output.GlobalAgent {
+			if !yes && !globalYes && !output.GlobalAgent {
 				fmt.Printf("确认移除 %s 的访问权限？[y/N]: ", user)
 				var input string
 				fmt.Scan(&input)

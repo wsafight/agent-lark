@@ -6,8 +6,8 @@ import (
 
 	larktask "github.com/larksuite/oapi-sdk-go/v3/service/task/v2"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newCreateCommand() *cobra.Command {
@@ -52,8 +52,12 @@ func newCreateCommand() *cobra.Command {
 			}
 
 			if due != "" {
+				dueMillis, err := parseDueToMillis(due)
+				if err != nil {
+					return fmt.Errorf("INVALID_DUE：%s", err.Error())
+				}
 				dueObj := larktask.NewDueBuilder().
-					Timestamp(due).
+					Timestamp(dueMillis).
 					IsAllDay(true).
 					Build()
 				taskBuilder = taskBuilder.Due(dueObj)
@@ -68,18 +72,17 @@ func newCreateCommand() *cobra.Command {
 				taskBuilder = taskBuilder.Members([]*larktask.Member{member})
 			}
 
-			reqBuilder := larktask.NewCreateTaskReqBuilder().
-				UserIdType("open_id").
-				InputTask(taskBuilder.Build())
-
 			if tasklistID != "" {
-				origin := larktask.NewOriginBuilder().
-					PlatformI18nName(larktask.NewI18nTextBuilder().ZhCn(tasklistID).Build()).
+				tasklist := larktask.NewTaskInTasklistInfoBuilder().
+					TasklistGuid(tasklistID).
 					Build()
-				_ = origin // tasklist association handled separately
+				taskBuilder = taskBuilder.Tasklists([]*larktask.TaskInTasklistInfo{tasklist})
 			}
 
-			req := reqBuilder.Build()
+			req := larktask.NewCreateTaskReqBuilder().
+				UserIdType("open_id").
+				InputTask(taskBuilder.Build()).
+				Build()
 
 			resp, err := c.Client.Task.V2.Task.Create(cmd.Context(), req, c.RequestOptions()...)
 			if err != nil {
@@ -105,7 +108,7 @@ func newCreateCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&title, "title", "", "任务标题（必填）")
 	cmd.Flags().StringVar(&description, "description", "", "任务描述")
-	cmd.Flags().StringVar(&due, "due", "", "截止日期（如 2024-12-31）")
+	cmd.Flags().StringVar(&due, "due", "", "截止时间（支持 YYYY-MM-DD / RFC3339 / Unix 秒或毫秒）")
 	cmd.Flags().StringVar(&assignee, "assignee", "", "负责人 open_id")
 	cmd.Flags().StringVar(&tasklistID, "tasklist-id", "", "任务清单 ID")
 	return cmd

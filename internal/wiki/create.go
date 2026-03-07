@@ -2,11 +2,12 @@ package wiki
 
 import (
 	"fmt"
+	"strings"
 
 	larkwiki "github.com/larksuite/oapi-sdk-go/v3/service/wiki/v2"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newCreateCommand() *cobra.Command {
@@ -66,7 +67,16 @@ func newCreateCommand() *cobra.Command {
 				nodeToken = *resp.Data.Node.NodeToken
 			}
 
-			pageURL := fmt.Sprintf("https://feishu.cn/wiki/%s", nodeToken)
+			effectiveOpenDomain := domain
+			if effectiveOpenDomain == "" && c.Cfg != nil {
+				effectiveOpenDomain = c.Cfg.Domain
+			}
+			webDomain := "feishu.cn"
+			if strings.Contains(strings.ToLower(effectiveOpenDomain), "larksuite") {
+				webDomain = "larksuite.com"
+			}
+
+			pageURL := fmt.Sprintf("https://%s/wiki/%s", webDomain, nodeToken)
 			output.PrintSuccess(quiet, fmt.Sprintf("页面已创建：%s", pageURL))
 
 			if output.GlobalAgent {

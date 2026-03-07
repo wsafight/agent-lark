@@ -2,8 +2,8 @@ package auth
 
 // publicAppID 和 publicAppSecret 在构建时通过 -ldflags 注入：
 //
-//	go build -ldflags "-X github.com/wangshian/agent-lark/internal/auth.publicAppID=cli_xxx \
-//	                   -X github.com/wangshian/agent-lark/internal/auth.publicAppSecret=yyy" \
+//	go build -ldflags "-X github.com/wsafight/agent-lark/internal/auth.publicAppID=cli_xxx \
+//	                   -X github.com/wsafight/agent-lark/internal/auth.publicAppSecret=yyy" \
 //	         ./cmd/agent-lark
 //
 // 开发本地构建时保持空值，命令会提示使用 agent-lark setup 替代。

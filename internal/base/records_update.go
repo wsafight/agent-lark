@@ -7,12 +7,13 @@ import (
 
 	larkbitable "github.com/larksuite/oapi-sdk-go/v3/service/bitable/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newRecordsUpdateCommand() *cobra.Command {
 	var fieldsJSON string
+	var fieldPairs []string
 
 	cmd := &cobra.Command{
 		Use:   "update <URL> <record_id>",
@@ -27,13 +28,22 @@ func newRecordsUpdateCommand() *cobra.Command {
 			format = output.FormatFromCmd(format)
 			_ = quiet
 
-			if fieldsJSON == "" {
-				return fmt.Errorf("MISSING_FLAG：--fields 为必填项")
+			if fieldsJSON == "" && len(fieldPairs) == 0 {
+				return fmt.Errorf("MISSING_FLAG：--fields 或 --field 至少提供一个")
 			}
 
-			var fields map[string]interface{}
-			if err := json.Unmarshal([]byte(fieldsJSON), &fields); err != nil {
-				return fmt.Errorf("INVALID_JSON：--fields 解析失败：%s", err.Error())
+			fields := make(map[string]interface{})
+			if fieldsJSON != "" {
+				if err := json.Unmarshal([]byte(fieldsJSON), &fields); err != nil {
+					return fmt.Errorf("INVALID_JSON：--fields 解析失败：%s", err.Error())
+				}
+			}
+			for _, pair := range fieldPairs {
+				k, v, err := parseFieldPair(pair)
+				if err != nil {
+					return fmt.Errorf("INVALID_FIELD：%s", err.Error())
+				}
+				fields[k] = v
 			}
 
 			appToken, tableID := ParseBitableURL(args[0])
@@ -90,5 +100,6 @@ func newRecordsUpdateCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&fieldsJSON, "fields", "", `字段 JSON（如 '{"姓名":"李四"}'）`)
+	cmd.Flags().StringArrayVar(&fieldPairs, "field", nil, `单个字段键值对，可重复使用（如 --field "姓名=李四" --field "年龄=30"）`)
 	return cmd
 }

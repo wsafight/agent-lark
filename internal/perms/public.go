@@ -7,8 +7,8 @@ import (
 
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newPublicCommand() *cobra.Command {
@@ -28,6 +28,7 @@ func newPublicCommand() *cobra.Command {
 			}
 			format = output.FormatFromCmd(format)
 			_ = quiet
+			globalYes, _ := cmd.Root().PersistentFlags().GetBool("yes")
 
 			token, fileType := ExtractResourceToken(args[0])
 
@@ -103,7 +104,7 @@ func newPublicCommand() *cobra.Command {
 			}
 
 			// Write mode
-			if !yes && !output.GlobalAgent {
+			if !yes && !globalYes && !output.GlobalAgent {
 				fmt.Printf("修改文档外部分享设置，确认？[y/N]: ")
 				var input string
 				fmt.Scan(&input)

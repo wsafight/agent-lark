@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/docs"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/docs"
+	"github.com/wsafight/agent-lark/internal/docxutil"
 )
 
 // ApplyOptions apply 命令的参数。
@@ -87,7 +88,7 @@ func Apply(opts ApplyOptions) (string, error) {
 		if res.Cfg != nil && strings.Contains(res.Cfg.Domain, "larksuite") {
 			domain = "larksuite.com"
 		}
-		return fmt.Sprintf("https://company.%s/docx/%s", domain, docToken), nil
+		return fmt.Sprintf("https://%s/docx/%s", domain, docToken), nil
 	}
 
 	// 追加到已有文档
@@ -99,38 +100,81 @@ func Apply(opts ApplyOptions) (string, error) {
 }
 
 func appendContent(res *client.Result, docToken, content, after, before string, matchIndex int) error {
-	paragraphs := strings.Split(strings.TrimSpace(content), "\n\n")
-	for _, para := range paragraphs {
-		para = strings.TrimSpace(para)
-		if para == "" {
-			continue
-		}
-		textElem := larkdocx.NewTextElementBuilder().
-			TextRun(larkdocx.NewTextRunBuilder().
-				Content(para).
-				Build()).
-			Build()
-		block := larkdocx.NewBlockBuilder().
-			BlockType(2). // paragraph
-			Text(larkdocx.NewTextBuilder().
-				Elements([]*larkdocx.TextElement{textElem}).
-				Build()).
-			Build()
-		req := larkdocx.NewCreateDocumentBlockChildrenReqBuilder().
-			DocumentId(docToken).
-			BlockId(docToken).
-			Body(larkdocx.NewCreateDocumentBlockChildrenReqBodyBuilder().
-				Children([]*larkdocx.Block{block}).
-				Index(-1).
-				Build()).
-			Build()
-		resp, err := res.Client.Docx.DocumentBlockChildren.Create(context.Background(), req, res.RequestOptions()...)
-		if err != nil {
-			return fmt.Errorf("追加内容失败：%w", err)
-		}
-		if !resp.Success() {
-			return fmt.Errorf("API 错误：%s（code %d）", resp.Msg, resp.Code)
-		}
+	insertIndex, err := resolveInsertIndex(res, docToken, after, before, matchIndex)
+	if err != nil {
+		return err
+	}
+
+	blocks := docxutil.MarkdownToBlocks(strings.TrimSpace(content))
+	if len(blocks) == 0 {
+		return nil
+	}
+
+	req := larkdocx.NewCreateDocumentBlockChildrenReqBuilder().
+		DocumentId(docToken).
+		BlockId(docToken).
+		Body(larkdocx.NewCreateDocumentBlockChildrenReqBodyBuilder().
+			Children(blocks).
+			Index(insertIndex).
+			Build()).
+		Build()
+	resp, err := res.Client.Docx.DocumentBlockChildren.Create(context.Background(), req, res.RequestOptions()...)
+	if err != nil {
+		return fmt.Errorf("追加内容失败：%w", err)
+	}
+	if !resp.Success() {
+		return fmt.Errorf("API 错误：%s（code %d）", resp.Msg, resp.Code)
 	}
 	return nil
+}
+
+func resolveInsertIndex(res *client.Result, docToken, after, before string, matchIndex int) (int, error) {
+	if after == "" && before == "" {
+		return -1, nil
+	}
+	if after != "" && before != "" {
+		return 0, fmt.Errorf("INVALID_FLAGS：--after 和 --before 不能同时使用")
+	}
+	if matchIndex < 0 {
+		return 0, fmt.Errorf("INVALID_INDEX：--match-index 不能为负数")
+	}
+
+	keyword := after
+	if keyword == "" {
+		keyword = before
+	}
+	keyword = strings.ToLower(strings.TrimSpace(keyword))
+	if keyword == "" {
+		return -1, nil
+	}
+
+	blocks, err := docxutil.FetchAllBlocks(context.Background(), res, docToken)
+	if err != nil {
+		return 0, err
+	}
+	outBlocks := docxutil.ConvertBlocks(blocks)
+
+	type match struct {
+		Index int
+		Text  string
+	}
+	var matches []match
+	for i, b := range outBlocks {
+		text := strings.ToLower(b.TextContent())
+		if strings.Contains(text, keyword) {
+			matches = append(matches, match{Index: i, Text: b.TextContent()})
+		}
+	}
+	if len(matches) == 0 {
+		return 0, fmt.Errorf("NOT_FOUND：未找到包含 %q 的段落", keyword)
+	}
+	if matchIndex >= len(matches) {
+		return 0, fmt.Errorf("INVALID_INDEX：--match-index %d 超出范围（共 %d 个匹配）", matchIndex, len(matches))
+	}
+
+	selected := matches[matchIndex]
+	if after != "" {
+		return selected.Index + 1, nil
+	}
+	return selected.Index, nil
 }

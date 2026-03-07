@@ -6,8 +6,8 @@ import (
 
 	larkcontact "github.com/larksuite/oapi-sdk-go/v3/service/contact/v3"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newListCommand() *cobra.Command {

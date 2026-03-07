@@ -7,8 +7,8 @@ import (
 
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 // roleLevel returns a numeric level for a permission role (lower = fewer permissions).
@@ -40,6 +40,7 @@ func newUpdateCommand() *cobra.Command {
 				output.GlobalAgent = true
 			}
 			_ = quiet
+			globalYes, _ := cmd.Root().PersistentFlags().GetBool("yes")
 
 			if user == "" {
 				return fmt.Errorf("MISSING_FLAG：--user 为必填项")
@@ -82,7 +83,7 @@ func newUpdateCommand() *cobra.Command {
 				isDowngrade = roleLevel(role) < roleLevel(current.Perm)
 			}
 
-			if isDowngrade && !yes && !output.GlobalAgent {
+			if isDowngrade && !yes && !globalYes && !output.GlobalAgent {
 				fmt.Printf("将 %s 的权限从 %s 降级为 %s，确认？[y/N]: ", user, current.Perm, role)
 				var input string
 				fmt.Scan(&input)

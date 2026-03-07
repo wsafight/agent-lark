@@ -2,11 +2,12 @@ package docs
 
 import (
 	"fmt"
+	"strings"
 
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newCreateCommand() *cobra.Command {
@@ -64,7 +65,16 @@ func newCreateCommand() *cobra.Command {
 				docToken = *resp.Data.Document.DocumentId
 			}
 
-			docURL := fmt.Sprintf("https://feishu.cn/docx/%s", docToken)
+			effectiveOpenDomain := domain
+			if effectiveOpenDomain == "" && c.Cfg != nil {
+				effectiveOpenDomain = c.Cfg.Domain
+			}
+			webDomain := "feishu.cn"
+			if strings.Contains(strings.ToLower(effectiveOpenDomain), "larksuite") {
+				webDomain = "larksuite.com"
+			}
+
+			docURL := fmt.Sprintf("https://%s/docx/%s", webDomain, docToken)
 			output.PrintSuccess(quiet, fmt.Sprintf("文档已创建：%s", docURL))
 
 			if output.GlobalAgent {

@@ -8,9 +8,9 @@ import (
 
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
-	"github.com/wangshian/agent-lark/internal/client"
-	"github.com/wangshian/agent-lark/internal/docs"
-	"github.com/wangshian/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/docs"
+	"github.com/wsafight/agent-lark/internal/output"
 )
 
 type addResult struct {
@@ -32,6 +32,7 @@ func newAddCommand() *cobra.Command {
 	var content string
 	var batch bool
 	var onError string
+	var strict bool
 
 	cmd := &cobra.Command{
 		Use:   "add <文档URL>",
@@ -120,6 +121,9 @@ func newAddCommand() *cobra.Command {
 					urls = append(urls, line)
 				}
 			}
+			if err := scanner.Err(); err != nil {
+				return fmt.Errorf("STDIN_ERROR：%s", err.Error())
+			}
 
 			var results []addResult
 			succeeded := 0
@@ -148,12 +152,21 @@ func newAddCommand() *cobra.Command {
 			}
 
 			if format == "json" {
-				return output.PrintJSON(os.Stdout, batchResp)
+				if err := output.PrintJSON(os.Stdout, batchResp); err != nil {
+					return err
+				}
+				if strict && failed > 0 {
+					return fmt.Errorf("PARTIAL_FAILURE：%d/%d 条评论添加失败", failed, len(urls))
+				}
+				return nil
 			}
 
 			fmt.Printf("✓ %d/%d 条评论已添加\n", succeeded, len(urls))
 			if failed > 0 {
 				fmt.Printf("✗ %d 条失败：%s\n", failed, strings.Join(failedURLs, ", "))
+			}
+			if strict && failed > 0 {
+				return fmt.Errorf("PARTIAL_FAILURE：%d/%d 条评论添加失败", failed, len(urls))
 			}
 			return nil
 		},
@@ -162,5 +175,6 @@ func newAddCommand() *cobra.Command {
 	cmd.Flags().StringVar(&content, "content", "", "评论内容（必填）")
 	cmd.Flags().BoolVar(&batch, "batch", false, "批量模式，从 stdin 读取 URL 列表")
 	cmd.Flags().StringVar(&onError, "on-error", "continue", "批量失败处理策略：continue|stop")
+	cmd.Flags().BoolVar(&strict, "strict", false, "批量模式下有失败时返回非零退出码")
 	return cmd
 }

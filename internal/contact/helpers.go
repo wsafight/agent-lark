@@ -1,6 +1,9 @@
 package contact
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
+)
 
 // PagedResponse is used for agent mode paged responses.
 type PagedResponse struct {
@@ -9,14 +12,6 @@ type PagedResponse struct {
 }
 
 func getGlobalFlags(cmd *cobra.Command) (format, tokenMode, profile, config, domain string, debug, quiet, agent bool) {
-	root := cmd.Root()
-	format, _ = root.PersistentFlags().GetString("format")
-	tokenMode, _ = root.PersistentFlags().GetString("token-mode")
-	profile, _ = root.PersistentFlags().GetString("profile")
-	config, _ = root.PersistentFlags().GetString("config")
-	domain, _ = root.PersistentFlags().GetString("domain")
-	debug, _ = root.PersistentFlags().GetBool("debug")
-	quiet, _ = root.PersistentFlags().GetBool("quiet")
-	agent, _ = root.PersistentFlags().GetBool("agent")
-	return
+	g := cmdutil.GetGlobalFlags(cmd)
+	return g.Format, g.TokenMode, g.Profile, g.Config, g.Domain, g.Debug, g.Quiet, g.Agent
 }

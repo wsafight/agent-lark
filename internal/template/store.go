@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/wangshian/agent-lark/internal/auth"
+	"github.com/wsafight/agent-lark/internal/auth"
 )
 
 type Template struct {
