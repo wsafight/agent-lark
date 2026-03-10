@@ -6,13 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-11
+
 ### Added
 - MIT LICENSE file
 - Makefile with build/test/lint/cover/install targets
 - golangci-lint configuration (`.golangci.yml`)
 - CI lint job via `golangci-lint-action`
-- Unit tests for `im`, `comments`, `contact`, `doctor` packages
+- Unit tests for `im`, `comments`, `contact`, `doctor`, `auth`, `client`, `base` packages
 - `CHANGELOG.md` and `CONTRIBUTING.md`
+
+### Changed
+- Unified all commands to use `cmdutil.ResolveGlobalFlags`
+- Simplified profile resolution with SHA-256 hash-based auto detection
+- Improved config decryption error handling (warn on stderr instead of fatal)
+
+### Removed
+- `profile_resolver.go` (merged into `profile_map.go`)
 
 ## [0.1.0] - 2026-03-11
 
