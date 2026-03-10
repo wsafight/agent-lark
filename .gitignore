@@ -2,7 +2,7 @@
 .DS_Store
 
 # Go binaries and build outputs
-agent-lark
+/agent-lark
 *.exe
 *.exe~
 *.dll
