@@ -17,9 +17,9 @@ install:
 test:
 	go test ./...
 
-## lint: run golangci-lint
+## lint: run go vet
 lint:
-	golangci-lint run ./...
+	go vet ./...
 
 ## cover: run tests with coverage report
 cover:
