@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Build binaries
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          LDFLAGS="-s -w -X main.Version=${VERSION}"
+          mkdir -p dist
+
+          GOOS=linux   GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/agent-lark_linux_amd64    ./cmd/agent-lark
+          GOOS=linux   GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/agent-lark_linux_arm64    ./cmd/agent-lark
+          GOOS=darwin  GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/agent-lark_darwin_amd64   ./cmd/agent-lark
+          GOOS=darwin  GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/agent-lark_darwin_arm64   ./cmd/agent-lark
+          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/agent-lark_windows_amd64.exe ./cmd/agent-lark
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
