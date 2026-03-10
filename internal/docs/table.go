@@ -30,23 +30,16 @@ func newTableCommand() *cobra.Command {
 		Short: "在文档中插入表格",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			docToken := ExtractDocID(args[0])
 			if docToken == "" {
 				return fmt.Errorf("INVALID_URL：无法解析文档 token")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			// Get all blocks
@@ -85,7 +78,7 @@ func newTableCommand() *cobra.Command {
 				}
 
 				if len(matches) > 1 && matchIndex < 0 {
-					if format == "json" {
+					if g.Format == "json" {
 						_ = output.PrintJSON(os.Stdout, map[string]any{
 							"error":   "AMBIGUOUS_MATCH",
 							"message": fmt.Sprintf("找到 %d 个匹配段落，请用 --match-index 指定", len(matches)),
@@ -241,9 +234,9 @@ func newTableCommand() *cobra.Command {
 				}
 			}
 
-			output.PrintSuccess(quiet, fmt.Sprintf("表格已插入文档 %s（%d 行 × %d 列）", docToken, rows, cols))
+			output.PrintSuccess(g.Quiet, fmt.Sprintf("表格已插入文档 %s（%d 行 × %d 列）", docToken, rows, cols))
 
-			if output.GlobalAgent {
+			if g.Agent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]any{
 					"document_id": docToken,
 					"rows":        rows,

@@ -31,6 +31,10 @@ func main() {
 			if agentMode {
 				output.GlobalAgent = true
 			}
+			// 跳过 upgrade/version 自身，避免重入或无意义检查
+			if name := cmd.Name(); name != "upgrade" && name != "version" {
+				StartBackgroundUpgrade()
+			}
 		},
 	}
 
@@ -45,7 +49,6 @@ func main() {
 	root.PersistentFlags().Bool("yes", false, "自动确认所有提示")
 
 	root.AddCommand(
-		newLoginCommand(),
 		newSetupCommand(),
 		NewAuthCommand(),
 		docs.NewCommand(),
@@ -58,7 +61,8 @@ func main() {
 		doctor.NewCommand(),
 		tmpl.NewCommand(),
 		perms.NewCommand(),
-		newInstallCommand(),
+		newInitCommand(),
+		newUpgradeCommand(),
 		newVersionCommand(),
 	)
 
@@ -112,6 +116,20 @@ func hintForCode(code string) string {
 		return "运行: agent-lark auth oauth"
 	case "MISSING_FLAG", "MISSING_ARG":
 		return "运行: agent-lark <命令> --help 查看参数说明"
+	case "INVALID_INPUT":
+		return "请检查输入格式后重试"
+	case "INVALID_URL":
+		return "请确认 URL 来自飞书/Lark 文档或多维表格页面"
+	case "INVALID_JSON":
+		return "请检查 JSON 语法，可用 jq . 验证格式"
+	case "CLIENT_ERROR":
+		return "运行: agent-lark doctor 诊断配置问题"
+	case "API_ERROR":
+		return "运行: agent-lark doctor 检查凭据与网络连通性"
+	case "UNSUPPORTED":
+		return "运行: agent-lark <命令> --help 查看支持的用法"
+	case "PARTIAL_FAILURE":
+		return "部分操作失败，请检查上方错误详情后重试"
 	default:
 		return ""
 	}

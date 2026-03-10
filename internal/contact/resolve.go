@@ -6,7 +6,6 @@ import (
 
 	larkcontact "github.com/larksuite/oapi-sdk-go/v3/service/contact/v3"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 )
 
@@ -16,8 +15,7 @@ func newResolveCommand() *cobra.Command {
 		Short: "通过邮箱解析 open_id",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			input := args[0]
 
@@ -25,15 +23,9 @@ func newResolveCommand() *cobra.Command {
 				return fmt.Errorf("UNSUPPORTED：仅支持邮箱解析，请输入包含 @ 的邮箱地址")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			req := larkcontact.NewBatchGetIdUserReqBuilder().

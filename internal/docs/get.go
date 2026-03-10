@@ -24,23 +24,16 @@ func newGetCommand() *cobra.Command {
 		Short: "获取文档内容",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			docToken := ExtractDocID(args[0])
 			if docToken == "" {
 				return fmt.Errorf("INVALID_URL：无法解析文档 token")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			// 获取文档元数据
@@ -77,7 +70,7 @@ func newGetCommand() *cobra.Command {
 			}
 
 			if metadataOnly {
-				if format == "json" {
+				if g.Format == "json" {
 					return output.PrintJSON(os.Stdout, meta)
 				}
 				fmt.Printf("ID:    %s\n", meta.DocumentID)
@@ -100,7 +93,7 @@ func newGetCommand() *cobra.Command {
 				outBlocks = filterSection(outBlocks, section)
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				type jsonBlock struct {
 					BlockID   string `json:"block_id"`
 					BlockType int    `json:"block_type"`

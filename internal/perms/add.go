@@ -8,7 +8,6 @@ import (
 
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -24,8 +23,7 @@ func newAddCommand() *cobra.Command {
 		Short: "添加协作者",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			if len(users) == 0 {
 				return fmt.Errorf("MISSING_FLAG：--user 为必填项")
@@ -33,15 +31,9 @@ func newAddCommand() *cobra.Command {
 
 			token, fileType := ExtractResourceToken(args[0])
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			type addResult struct {
@@ -92,7 +84,7 @@ func newAddCommand() *cobra.Command {
 				results = append(results, addResult{User: user, Status: "succeeded"})
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				if err := output.PrintJSON(os.Stdout, results); err != nil {
 					return err
 				}

@@ -6,7 +6,6 @@ import (
 
 	larksearch "github.com/larksuite/oapi-sdk-go/v3/service/search/v2"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -20,20 +19,13 @@ func newSearchCommand() *cobra.Command {
 		Short: "按关键词搜索文档",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			keyword := args[0]
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			req := larksearch.NewSearchDocWikiReqBuilder().
@@ -90,7 +82,7 @@ func newSearchCommand() *cobra.Command {
 				items = append(items, item)
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, items)
 			}
 

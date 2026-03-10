@@ -6,7 +6,6 @@ import (
 
 	larktask "github.com/larksuite/oapi-sdk-go/v3/service/task/v2"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -22,22 +21,15 @@ func newCreateCommand() *cobra.Command {
 		Use:   "create",
 		Short: "创建任务",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			if title == "" {
 				return fmt.Errorf("MISSING_FLAG：--title 为必填项")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			taskBuilder := larktask.NewInputTaskBuilder().
@@ -93,7 +85,7 @@ func newCreateCommand() *cobra.Command {
 				createdID = *resp.Data.Task.Guid
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, map[string]string{"task_id": createdID})
 			}
 

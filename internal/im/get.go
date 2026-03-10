@@ -6,7 +6,6 @@ import (
 
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -20,18 +19,11 @@ func newMessagesGetCommand() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			messageID := args[0]
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			builder := larkim.NewGetMessageReqBuilder().MessageId(messageID)
@@ -102,7 +94,7 @@ func newMessagesGetCommand() *cobra.Command {
 				item.Updated = *msg.Updated
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, item)
 			}
 

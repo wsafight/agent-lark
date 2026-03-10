@@ -6,7 +6,6 @@ import (
 
 	larkcontact "github.com/larksuite/oapi-sdk-go/v3/service/contact/v3"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -21,18 +20,11 @@ func newListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "列举用户",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			deptID := "0" // root department
@@ -114,8 +106,8 @@ func newListCommand() *cobra.Command {
 				pageToken = nextPageToken
 			}
 
-			if format == "json" {
-				if agent {
+			if g.Format == "json" {
+				if g.Agent {
 					return output.PrintJSON(os.Stdout, PagedResponse{Items: items, NextCursor: nextToken})
 				}
 				return output.PrintJSON(os.Stdout, items)

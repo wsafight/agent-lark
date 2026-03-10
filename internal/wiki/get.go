@@ -7,7 +7,6 @@ import (
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	larkwiki "github.com/larksuite/oapi-sdk-go/v3/service/wiki/v2"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/docxutil"
 	"github.com/wsafight/agent-lark/internal/output"
@@ -22,23 +21,16 @@ func newGetCommand() *cobra.Command {
 		Short: "获取知识库页面内容",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			wikiToken := ExtractWikiToken(args[0])
 			if wikiToken == "" {
 				return fmt.Errorf("INVALID_URL：无法解析 wiki token")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			// Get node to find obj_token (document token)
@@ -103,7 +95,7 @@ func newGetCommand() *cobra.Command {
 			}
 			outBlocks := docxutil.ConvertBlocks(allBlocks)
 
-			if format == "json" {
+			if g.Format == "json" {
 				type jsonBlock struct {
 					BlockID   string `json:"block_id"`
 					BlockType int    `json:"block_type"`

@@ -11,7 +11,7 @@ import (
 // ValidateAppCredentials 通过获取 tenant_access_token 验证应用凭据是否有效。
 func ValidateAppCredentials(appID, appSecret, openBaseDomain string) error {
 	clientOpts := []lark.ClientOptionFunc{}
-	domain := normalizeOpenBaseDomain(openBaseDomain)
+	domain := NormalizeDomain(openBaseDomain)
 	if domain != "" {
 		clientOpts = append(clientOpts, lark.WithOpenBaseUrl(domain))
 	}
@@ -27,7 +27,8 @@ func ValidateAppCredentials(appID, appSecret, openBaseDomain string) error {
 	return nil
 }
 
-func normalizeOpenBaseDomain(domain string) string {
+// NormalizeDomain strips protocol prefix, trailing slash, and path from a domain string.
+func NormalizeDomain(domain string) string {
 	d := strings.TrimSpace(domain)
 	d = strings.TrimPrefix(d, "https://")
 	d = strings.TrimPrefix(d, "http://")

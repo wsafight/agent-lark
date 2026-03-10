@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -46,7 +45,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// 3. 验证应用凭据
-	domain := normalizeDomain(cfg.Domain)
+	domain := auth.NormalizeDomain(cfg.Domain)
 	if err := auth.ValidateAppCredentials(cfg.AppID, cfg.AppSecret, domain); err != nil {
 		fail("应用凭据无效  "+cfg.AppID, err.Error())
 		return nil
@@ -83,13 +82,3 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func normalizeDomain(domain string) string {
-	d := strings.TrimSpace(domain)
-	d = strings.TrimPrefix(d, "https://")
-	d = strings.TrimPrefix(d, "http://")
-	d = strings.TrimSuffix(d, "/")
-	if i := strings.Index(d, "/"); i >= 0 {
-		d = d[:i]
-	}
-	return d
-}

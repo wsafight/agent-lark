@@ -7,7 +7,6 @@ import (
 
 	larkcontact "github.com/larksuite/oapi-sdk-go/v3/service/contact/v3"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -25,8 +24,7 @@ func newSearchCommand() *cobra.Command {
 		Short: "通过邮箱查询用户",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			query := args[0]
 
@@ -34,15 +32,9 @@ func newSearchCommand() *cobra.Command {
 				return fmt.Errorf("UNSUPPORTED：仅支持邮箱搜索，请输入包含 @ 的邮箱地址")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			req := larkcontact.NewBatchGetIdUserReqBuilder().
@@ -74,7 +66,7 @@ func newSearchCommand() *cobra.Command {
 				}
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, items)
 			}
 

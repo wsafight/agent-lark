@@ -7,7 +7,6 @@ import (
 
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -23,17 +22,11 @@ func newSendCommand() *cobra.Command {
 		Use:   "send",
 		Short: "发送消息",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, agent := cmdutil.ResolveTuple(cmd)
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			// Determine receive ID and type
@@ -118,9 +111,9 @@ func newSendCommand() *cobra.Command {
 				messageID = *resp.Data.MessageId
 			}
 
-			output.PrintSuccess(quiet, fmt.Sprintf("消息已发送，message_id: %s", messageID))
+			output.PrintSuccess(g.Quiet, fmt.Sprintf("消息已发送，message_id: %s", messageID))
 
-			if agent {
+			if g.Agent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{
 					"message_id": messageID,
 					"chat_id":    receiveID,

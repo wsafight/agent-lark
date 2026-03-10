@@ -8,7 +8,6 @@ import (
 
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/docs"
 	"github.com/wsafight/agent-lark/internal/output"
@@ -40,22 +39,15 @@ func newAddCommand() *cobra.Command {
 		Short: "添加文档评论",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			if content == "" {
 				return fmt.Errorf("MISSING_FLAG：--content 为必填项")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			addComment := func(docURL string) addResult {
@@ -101,7 +93,7 @@ func newAddCommand() *cobra.Command {
 				if result.Status == "failed" {
 					return fmt.Errorf("%s：%s", result.Error, result.Message)
 				}
-				if format == "json" {
+				if g.Format == "json" {
 					return output.PrintJSON(os.Stdout, result)
 				}
 				fmt.Printf("评论已添加，comment_id: %s\n", result.CommentID)
@@ -147,7 +139,7 @@ func newAddCommand() *cobra.Command {
 				Results:   results,
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				if err := output.PrintJSON(os.Stdout, batchResp); err != nil {
 					return err
 				}

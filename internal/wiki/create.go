@@ -6,7 +6,6 @@ import (
 
 	larkwiki "github.com/larksuite/oapi-sdk-go/v3/service/wiki/v2"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -19,7 +18,7 @@ func newCreateCommand() *cobra.Command {
 		Short: "在知识空间创建新页面",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			if title == "" {
 				return fmt.Errorf("MISSING_FLAG：--title 是必填项")
@@ -30,15 +29,9 @@ func newCreateCommand() *cobra.Command {
 				return fmt.Errorf("INVALID_URL：无法解析 wiki token")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			objType := "docx"
@@ -65,7 +58,7 @@ func newCreateCommand() *cobra.Command {
 				nodeToken = *resp.Data.Node.NodeToken
 			}
 
-			effectiveOpenDomain := domain
+			effectiveOpenDomain := g.Domain
 			if effectiveOpenDomain == "" && c.Cfg != nil {
 				effectiveOpenDomain = c.Cfg.Domain
 			}
@@ -75,9 +68,9 @@ func newCreateCommand() *cobra.Command {
 			}
 
 			pageURL := fmt.Sprintf("https://%s/wiki/%s", webDomain, nodeToken)
-			output.PrintSuccess(quiet, fmt.Sprintf("页面已创建：%s", pageURL))
+			output.PrintSuccess(g.Quiet, fmt.Sprintf("页面已创建：%s", pageURL))
 
-			if output.GlobalAgent {
+			if g.Agent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{
 					"node_token": nodeToken,
 					"url":        pageURL,

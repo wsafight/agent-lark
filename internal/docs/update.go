@@ -9,7 +9,6 @@ import (
 
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -24,7 +23,7 @@ func newUpdateCommand() *cobra.Command {
 		Short: "向文档追加内容",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			docToken := ExtractDocID(args[0])
 			if docToken == "" {
@@ -51,15 +50,9 @@ func newUpdateCommand() *cobra.Command {
 				return fmt.Errorf("MISSING_CONTENT：需要 --content、--stdin 或 --file 之一")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			// Parse content into paragraphs
@@ -87,9 +80,9 @@ func newUpdateCommand() *cobra.Command {
 				return fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
 			}
 
-			output.PrintSuccess(quiet, fmt.Sprintf("已追加 %d 段内容到文档 %s", len(paragraphs), docToken))
+			output.PrintSuccess(g.Quiet, fmt.Sprintf("已追加 %d 段内容到文档 %s", len(paragraphs), docToken))
 
-			if output.GlobalAgent {
+			if g.Agent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]any{
 					"document_id":     docToken,
 					"appended_blocks": len(children),

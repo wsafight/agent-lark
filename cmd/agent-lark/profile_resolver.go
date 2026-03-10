@@ -6,12 +6,7 @@ func detectProjectRoot(cwd string) string {
 	return auth.DetectProjectRoot(cwd)
 }
 
-func mappedProfile(projectRoot string) string {
-	return auth.MappedProfile(projectRoot)
-}
-
-func resolveEffectiveProfile(explicitProfile, projectRoot string) string {
-	_ = projectRoot
+func resolveEffectiveProfile(explicitProfile string) string {
 	return auth.ResolveEffectiveProfile(explicitProfile)
 }
 

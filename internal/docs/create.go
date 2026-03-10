@@ -6,7 +6,6 @@ import (
 
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -19,21 +18,15 @@ func newCreateCommand() *cobra.Command {
 		Use:   "create",
 		Short: "创建新文档",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			if title == "" {
 				return fmt.Errorf("MISSING_FLAG：--title 是必填项")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			builder := larkdocx.NewCreateDocumentReqBodyBuilder().
@@ -63,7 +56,7 @@ func newCreateCommand() *cobra.Command {
 				docToken = *resp.Data.Document.DocumentId
 			}
 
-			effectiveOpenDomain := domain
+			effectiveOpenDomain := g.Domain
 			if effectiveOpenDomain == "" && c.Cfg != nil {
 				effectiveOpenDomain = c.Cfg.Domain
 			}
@@ -73,9 +66,9 @@ func newCreateCommand() *cobra.Command {
 			}
 
 			docURL := fmt.Sprintf("https://%s/docx/%s", webDomain, docToken)
-			output.PrintSuccess(quiet, fmt.Sprintf("文档已创建：%s", docURL))
+			output.PrintSuccess(g.Quiet, fmt.Sprintf("文档已创建：%s", docURL))
 
-			if output.GlobalAgent {
+			if g.Agent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{
 					"document_id": docToken,
 					"url":         docURL,

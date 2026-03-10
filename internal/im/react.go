@@ -5,7 +5,6 @@ import (
 
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
@@ -18,7 +17,7 @@ func newReactAddCommand() *cobra.Command {
 		Use:   "add",
 		Short: "添加表情回复",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			if messageID == "" {
 				return fmt.Errorf("MISSING_FLAG：--message-id 是必填项")
@@ -27,15 +26,9 @@ func newReactAddCommand() *cobra.Command {
 				return fmt.Errorf("MISSING_FLAG：--emoji 是必填项")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			req := larkim.NewCreateMessageReactionReqBuilder().
@@ -58,9 +51,9 @@ func newReactAddCommand() *cobra.Command {
 				reactionID = *resp.Data.ReactionId
 			}
 
-			output.PrintSuccess(quiet, fmt.Sprintf("表情已添加，reaction_id: %s", reactionID))
+			output.PrintSuccess(g.Quiet, fmt.Sprintf("表情已添加，reaction_id: %s", reactionID))
 
-			if output.GlobalAgent {
+			if g.Agent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{
 					"reaction_id": reactionID,
 					"message_id":  messageID,
@@ -86,7 +79,7 @@ func newReactRemoveCommand() *cobra.Command {
 		Use:   "remove",
 		Short: "删除表情回复",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			if messageID == "" {
 				return fmt.Errorf("MISSING_FLAG：--message-id 是必填项")
@@ -95,15 +88,9 @@ func newReactRemoveCommand() *cobra.Command {
 				return fmt.Errorf("MISSING_FLAG：--reaction-id 是必填项")
 			}
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			req := larkim.NewDeleteMessageReactionReqBuilder().
@@ -119,9 +106,9 @@ func newReactRemoveCommand() *cobra.Command {
 				return fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
 			}
 
-			output.PrintSuccess(quiet, fmt.Sprintf("表情已删除，reaction_id: %s", reactionID))
+			output.PrintSuccess(g.Quiet, fmt.Sprintf("表情已删除，reaction_id: %s", reactionID))
 
-			if output.GlobalAgent {
+			if g.Agent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{
 					"reaction_id": reactionID,
 					"message_id":  messageID,

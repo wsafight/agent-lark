@@ -1,14 +1,13 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/auth"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -16,7 +15,7 @@ import (
 func NewAuthCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "auth", Short: "认证管理"}
 	cmd.AddCommand(
-		newAuthLoginCommand(),
+		newAuthPublicLoginCommand(),
 		newAuthOAuthCommand(),
 		newAuthStatusCommand(),
 		newAuthProfileCommand(),
@@ -26,70 +25,50 @@ func NewAuthCommand() *cobra.Command {
 	return cmd
 }
 
-func newAuthLoginCommand() *cobra.Command {
-	var appID string
-	var appSecret string
-	var domain string
-
-	cmd := &cobra.Command{
+// newAuthPublicLoginCommand 使用内置公共应用快速登录（仅特殊构建可用）。
+func newAuthPublicLoginCommand() *cobra.Command {
+	return &cobra.Command{
 		Use:   "login",
-		Short: "配置应用凭据",
+		Short: "使用内置公共应用登录（快速，仅特定构建可用）",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			profile, _ := cmd.Root().PersistentFlags().GetString("profile")
-			config, _ := cmd.Root().PersistentFlags().GetString("config")
+			g := cmdutil.GetGlobalFlags(cmd)
 
-			reader := bufio.NewReader(os.Stdin)
-
-			// Interactive prompts for missing values
-			if appID == "" {
-				fmt.Print("请输入 App ID: ")
-				line, _ := reader.ReadString('\n')
-				appID = strings.TrimSpace(line)
-			}
-			if appSecret == "" {
-				fmt.Print("请输入 App Secret: ")
-				line, _ := reader.ReadString('\n')
-				appSecret = strings.TrimSpace(line)
+			if !auth.PublicAppAvailable() {
+				fmt.Println("当前构建未内置公共应用凭据。")
+				fmt.Println("请改用: agent-lark setup")
+				return nil
 			}
 
-			if appID == "" || appSecret == "" {
-				return fmt.Errorf("App ID 和 App Secret 不能为空")
-			}
-
-			// Validate
-			fmt.Print("正在验证凭据...")
-			if err := auth.ValidateAppCredentials(appID, appSecret, domain); err != nil {
-				fmt.Println(" 失败")
-				return fmt.Errorf("凭据验证失败：%w", err)
-			}
-			fmt.Println(" ✓")
+			appID, appSecret := auth.PublicAppCredentials()
 
 			cfg := &auth.Config{
 				AppID:            appID,
 				AppSecret:        appSecret,
-				Domain:           domain,
 				DefaultTokenMode: "auto",
 			}
-
-			if err := auth.Save(cfg, config, profile); err != nil {
+			if err := auth.Save(cfg, g.Config, g.Profile); err != nil {
 				return fmt.Errorf("保存配置失败：%w", err)
 			}
+			fmt.Println("✓ 公共应用凭据已配置")
 
-			cwd, _ := os.Getwd()
+			cwd, err := os.Getwd()
+			if err != nil {
+				cwd = "."
+			}
 			projectRoot := detectProjectRoot(cwd)
-			effectiveProfile := resolveEffectiveProfile(profile, projectRoot)
-			_ = saveProjectBinding(projectRoot, effectiveProfile)
+			effectiveProfile := resolveEffectiveProfile(g.Profile)
 
-			fmt.Printf("✓ 凭据已保存（profile: %s）\n", effectiveProfile)
+			if err := auth.OAuthLogin(appID, appSecret, oauthScope, g.Config, effectiveProfile, oauthCallbackPort); err != nil {
+				return fmt.Errorf("OAuth 登录失败：%w", err)
+			}
+
+			_ = saveProjectBinding(projectRoot, effectiveProfile)
+			fmt.Println("✓ 登录成功")
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVar(&appID, "app-id", "", "飞书应用 App ID")
-	cmd.Flags().StringVar(&appSecret, "app-secret", "", "飞书应用 App Secret")
-	cmd.Flags().StringVar(&domain, "domain", "", "API 域名（默认 open.feishu.cn）")
-	return cmd
 }
+
 
 func newAuthOAuthCommand() *cobra.Command {
 	var scope string
@@ -99,10 +78,9 @@ func newAuthOAuthCommand() *cobra.Command {
 		Use:   "oauth",
 		Short: "追加用户授权（OAuth）",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			profile, _ := cmd.Root().PersistentFlags().GetString("profile")
-			config, _ := cmd.Root().PersistentFlags().GetString("config")
+			g := cmdutil.GetGlobalFlags(cmd)
 
-			cfg, _, err := auth.Load(config, profile)
+			cfg, _, err := auth.Load(g.Config, g.Profile)
 			if err != nil {
 				return err
 			}
@@ -111,7 +89,7 @@ func newAuthOAuthCommand() *cobra.Command {
 				return fmt.Errorf("AUTH_REQUIRED：请先运行 'agent-lark setup' 配置应用凭据")
 			}
 
-			if err := auth.OAuthLogin(cfg.AppID, cfg.AppSecret, scope, config, profile, port); err != nil {
+			if err := auth.OAuthLogin(cfg.AppID, cfg.AppSecret, scope, g.Config, g.Profile, port); err != nil {
 				return err
 			}
 
@@ -129,21 +107,10 @@ func newAuthStatusCommand() *cobra.Command {
 		Use:   "status",
 		Short: "显示当前认证状态",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			profile, _ := cmd.Root().PersistentFlags().GetString("profile")
-			config, _ := cmd.Root().PersistentFlags().GetString("config")
-			format, _ := cmd.Root().PersistentFlags().GetString("format")
-			agent, _ := cmd.Root().PersistentFlags().GetBool("agent")
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			g := cmdutil.ResolveGlobalFlags(cmd)
+			effectiveProfile := auth.ResolveEffectiveProfile(g.Profile)
 
-			cwd, _ := os.Getwd()
-			projectRoot := detectProjectRoot(cwd)
-			effectiveProfile := resolveEffectiveProfile(profile, projectRoot)
-
-			cfg, cfgPath, err := auth.Load(config, effectiveProfile)
+			cfg, cfgPath, err := auth.Load(g.Config, effectiveProfile)
 			if err != nil {
 				return err
 			}
@@ -151,6 +118,7 @@ func newAuthStatusCommand() *cobra.Command {
 			type tokenStatus struct {
 				Name      string `json:"name,omitempty"`
 				ExpiresAt string `json:"expires_at,omitempty"`
+				Remaining string `json:"remaining,omitempty"`
 				Valid     bool   `json:"valid"`
 			}
 
@@ -173,15 +141,20 @@ func newAuthStatusCommand() *cobra.Command {
 
 			if cfg.UserSession != nil && cfg.UserSession.UserAccessToken != "" {
 				expiresAt, _ := time.Parse(time.RFC3339, cfg.UserSession.ExpiresAt)
-				valid := time.Now().Before(expiresAt)
-				result.User = &tokenStatus{
+				now := time.Now()
+				valid := now.Before(expiresAt)
+				ts := &tokenStatus{
 					Name:      cfg.UserSession.Name,
 					ExpiresAt: cfg.UserSession.ExpiresAt,
 					Valid:     valid,
 				}
+				if valid {
+					ts.Remaining = expiresAt.Sub(now).Round(time.Minute).String()
+				}
+				result.User = ts
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, result)
 			}
 
@@ -193,11 +166,11 @@ func newAuthStatusCommand() *cobra.Command {
 			}
 			fmt.Printf("Token 模式: %s\n", result.TokenMode)
 			if result.User != nil {
-				status := "有效"
-				if !result.User.Valid {
-					status = "已过期"
+				if result.User.Valid {
+					fmt.Printf("用户 Token: %s（有效，剩余 %s）\n", result.User.Name, result.User.Remaining)
+				} else {
+					fmt.Printf("用户 Token: %s（已过期，运行 'agent-lark auth oauth' 刷新）\n", result.User.Name)
 				}
-				fmt.Printf("用户 Token: %s（%s，%s）\n", result.User.Name, status, result.User.ExpiresAt)
 			} else {
 				fmt.Println("用户 Token: 未配置（运行 'agent-lark auth oauth' 授权）")
 			}
@@ -213,20 +186,14 @@ func newAuthProfileCommand() *cobra.Command {
 		Use:   "list",
 		Short: "列出所有 profiles",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, _ := cmd.Root().PersistentFlags().GetString("format")
-			agent, _ := cmd.Root().PersistentFlags().GetBool("agent")
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			profiles, err := auth.ListProfiles()
 			if err != nil {
 				return fmt.Errorf("列出 profiles 失败：%w", err)
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, profiles)
 			}
 
@@ -234,8 +201,13 @@ func newAuthProfileCommand() *cobra.Command {
 				fmt.Println("（无 profiles）")
 				return nil
 			}
+			active := auth.ResolveEffectiveProfile("")
 			for _, p := range profiles {
-				fmt.Println(p)
+				if p == active {
+					fmt.Printf("* %s  (当前)\n", p)
+				} else {
+					fmt.Printf("  %s\n", p)
+				}
 			}
 			return nil
 		},
@@ -248,7 +220,10 @@ func newAuthProfileCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			profileName := args[0]
 
-			cwd, _ := os.Getwd()
+			cwd, err := os.Getwd()
+			if err != nil {
+				cwd = "."
+			}
 			projectRoot := detectProjectRoot(cwd)
 
 			if err := saveProjectBinding(projectRoot, profileName); err != nil {
@@ -270,21 +245,20 @@ func newAuthSetModeCommand() *cobra.Command {
 		Short: "修改默认 Token 模式",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			profile, _ := cmd.Root().PersistentFlags().GetString("profile")
-			config, _ := cmd.Root().PersistentFlags().GetString("config")
+			g := cmdutil.GetGlobalFlags(cmd)
 
 			mode := args[0]
 			if mode != "auto" && mode != "tenant" && mode != "user" {
 				return fmt.Errorf("无效的 Token 模式：%s（支持 auto|tenant|user）", mode)
 			}
 
-			cfg, _, err := auth.Load(config, profile)
+			cfg, _, err := auth.Load(g.Config, g.Profile)
 			if err != nil {
 				return err
 			}
 
 			cfg.DefaultTokenMode = mode
-			if err := auth.Save(cfg, config, profile); err != nil {
+			if err := auth.Save(cfg, g.Config, g.Profile); err != nil {
 				return fmt.Errorf("保存配置失败：%w", err)
 			}
 
@@ -302,12 +276,10 @@ func newAuthLogoutCommand() *cobra.Command {
 		Use:   "logout",
 		Short: "退出登录",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			profile, _ := cmd.Root().PersistentFlags().GetString("profile")
-			config, _ := cmd.Root().PersistentFlags().GetString("config")
+			g := cmdutil.GetGlobalFlags(cmd)
 
 			if all {
-				// Full reset: remove the config file
-				cfgPath := auth.ResolveConfigPath(config, profile)
+				cfgPath := auth.ResolveConfigPath(g.Config, g.Profile)
 				if err := os.Remove(cfgPath); err != nil && !os.IsNotExist(err) {
 					return fmt.Errorf("删除配置失败：%w", err)
 				}
@@ -315,48 +287,21 @@ func newAuthLogoutCommand() *cobra.Command {
 				return nil
 			}
 
-			if userOnly {
-				cfg, _, err := auth.Load(config, profile)
-				if err != nil {
-					return err
-				}
-				cfg.UserSession = nil
-				if err := auth.Save(cfg, config, profile); err != nil {
-					return fmt.Errorf("保存配置失败：%w", err)
-				}
-				fmt.Println("✓ 已清除用户 Token")
-				return nil
-			}
-
-			// Default: clear user token
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("清除用户 Token（--user）还是全部重置（--all）？输入 'all' 全部重置，其他清除用户 Token: ")
-			choice, _ := reader.ReadString('\n')
-			choice = strings.TrimSpace(strings.ToLower(choice))
-
-			cfg, _, err := auth.Load(config, profile)
+			// Default (no flags) and --user: clear user token only
+			cfg, _, err := auth.Load(g.Config, g.Profile)
 			if err != nil {
 				return err
 			}
-
-			if choice == "all" {
-				cfgPath := auth.ResolveConfigPath(config, profile)
-				if err := os.Remove(cfgPath); err != nil && !os.IsNotExist(err) {
-					return fmt.Errorf("删除配置失败：%w", err)
-				}
-				fmt.Println("✓ 已清除所有认证信息")
-			} else {
-				cfg.UserSession = nil
-				if err := auth.Save(cfg, config, profile); err != nil {
-					return fmt.Errorf("保存配置失败：%w", err)
-				}
-				fmt.Println("✓ 已清除用户 Token")
+			cfg.UserSession = nil
+			if err := auth.Save(cfg, g.Config, g.Profile); err != nil {
+				return fmt.Errorf("保存配置失败：%w", err)
 			}
+			fmt.Println("✓ 已清除用户 Token（使用 --all 可同时清除应用凭据）")
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVar(&userOnly, "user", false, "仅清除用户 Token")
+	cmd.Flags().BoolVar(&userOnly, "user", false, "仅清除用户 Token（默认行为）")
 	cmd.Flags().BoolVar(&all, "all", false, "全部重置（包括应用凭据）")
 	return cmd
 }
