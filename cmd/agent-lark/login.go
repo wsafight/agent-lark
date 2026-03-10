@@ -127,13 +127,7 @@ func runSetupWizard(config, profile string) (string, error) {
 	}
 	fmt.Println("✓ 应用凭据已保存")
 
-	// 项目绑定
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "."
-	}
-	projectRoot := detectProjectRoot(cwd)
-	effectiveProfile := resolveEffectiveProfile(profile)
+	effectiveProfile := auth.ResolveEffectiveProfile(profile)
 
 	// Step 6: 用户 OAuth
 	hasOAuth := existing != nil && existing.UserSession != nil && existing.UserSession.UserAccessToken != ""
@@ -154,7 +148,6 @@ func runSetupWizard(config, profile string) (string, error) {
 		fmt.Println("  （跳过，可稍后运行 'agent-lark auth oauth' 授权）")
 	}
 
-	_ = saveProjectBinding(projectRoot, effectiveProfile)
 	return effectiveProfile, nil
 }
 

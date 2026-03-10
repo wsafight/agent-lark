@@ -1,15 +1,12 @@
 package auth
 
 import (
-	"encoding/json"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
-
-func projectMapPath() string {
-	return filepath.Join(HomeDir(), "project-map.json")
-}
 
 // DetectProjectRoot walks up from cwd and returns the nearest project root.
 func DetectProjectRoot(cwd string) string {
@@ -29,24 +26,15 @@ func DetectProjectRoot(cwd string) string {
 	return cwd
 }
 
-// MappedProfile returns the bound profile for a project root.
-func MappedProfile(projectRoot string) string {
-	if projectRoot == "" {
-		return ""
-	}
-	data, err := os.ReadFile(projectMapPath())
-	if err != nil {
-		return ""
-	}
-	var m map[string]string
-	if err := json.Unmarshal(data, &m); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(m[projectRoot])
+// ProjectHashProfile derives a stable profile name from a project root path.
+// Returns "project-" followed by the first 16 hex characters of the SHA-256 hash.
+func ProjectHashProfile(projectRoot string) string {
+	sum := sha256.Sum256([]byte(projectRoot))
+	return fmt.Sprintf("project-%x", sum[:8])
 }
 
 // ResolveEffectiveProfile resolves profile precedence:
-// explicit flag > AGENT_LARK_PROFILE > project binding > default.
+// explicit flag > AGENT_LARK_PROFILE > project hash > default.
 func ResolveEffectiveProfile(explicitProfile string) string {
 	if p := strings.TrimSpace(explicitProfile); p != "" {
 		return p
@@ -57,38 +45,7 @@ func ResolveEffectiveProfile(explicitProfile string) string {
 	cwd, err := os.Getwd()
 	if err == nil {
 		root := DetectProjectRoot(cwd)
-		if p := MappedProfile(root); p != "" {
-			return p
-		}
+		return ProjectHashProfile(root)
 	}
 	return "default"
-}
-
-// SaveProjectBinding binds a project root to a profile name.
-func SaveProjectBinding(projectRoot, profile string) error {
-	if projectRoot == "" || profile == "" {
-		return nil
-	}
-
-	path := projectMapPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return err
-	}
-
-	m := map[string]string{}
-	if data, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(data, &m)
-	}
-
-	m[projectRoot] = profile
-	data, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }

@@ -1,6 +1,7 @@
 package base
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -99,3 +100,60 @@ func TestParseFieldPair(t *testing.T) {
 		})
 	}
 }
+
+func TestParseBitableURLStrict(t *testing.T) {
+	tests := []struct {
+		name         string
+		url          string
+		wantAppToken string
+		wantTableID  string
+		wantErr      bool
+		errContains  string
+	}{
+		{
+			name:         "有效 URL",
+			url:          "https://company.feishu.cn/base/bascnABCDEF?table=tblXYZ123",
+			wantAppToken: "bascnABCDEF",
+			wantTableID:  "tblXYZ123",
+		},
+		{
+			name:        "缺少 tableID",
+			url:         "https://company.feishu.cn/base/bascnABCDEF",
+			wantErr:     true,
+			errContains: "缺少 table",
+		},
+		{
+			name:        "无法解析",
+			url:         "not-a-valid-url",
+			wantErr:     true,
+			errContains: "INVALID_URL",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			appToken, tableID, err := parseBitableURLStrict(tc.url)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("期望错误，但未返回")
+				}
+				if tc.errContains != "" {
+					if got := err.Error(); !strings.Contains(got, tc.errContains) {
+						t.Errorf("错误信息应含 %q：got %q", tc.errContains, got)
+					}
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("意外错误：%v", err)
+			}
+			if appToken != tc.wantAppToken {
+				t.Errorf("appToken：got %q, want %q", appToken, tc.wantAppToken)
+			}
+			if tableID != tc.wantTableID {
+				t.Errorf("tableID：got %q, want %q", tableID, tc.wantTableID)
+			}
+		})
+	}
+}
+

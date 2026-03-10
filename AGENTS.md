@@ -15,7 +15,7 @@ go vet ./...                     # Static analysis
 
 - Error strings must use the `UPPER_SNAKE_CASE：message` convention (full-width colon `：`).
   Examples: `"INVALID_URL：无法解析文档 token"`, `"MISSING_FLAG：请提供 --file 或 --content"`.
-- All global flags are read via `cmdutil.ResolveTuple(cmd)` or `cmdutil.GetGlobalFlags(cmd)`. Never read root flags directly from `cmd.Root().PersistentFlags()` in command handlers.
+- All global flags are read via `cmdutil.ResolveGlobalFlags(cmd)` (applies agent/format side effects) or `cmdutil.GetGlobalFlags(cmd)` (pure read). Never read root flags directly from `cmd.Root().PersistentFlags()` in command handlers. Use `g.ClientOptions()` to pass options to business logic, and `g.NewClient()` to create a Feishu client.
 - Paginated list commands in `--agent` mode must return `cmdutil.PagedResponse{Items: items, NextCursor: token}`. Non-agent mode returns the slice directly.
 - CLI flags use kebab-case (`--token-mode`, `--chat-id`). Never camelCase.
 - Do not add emojis to CLI output or source code. Unicode symbols (✓, ✗) are acceptable.
@@ -31,7 +31,7 @@ When adding or changing user-facing features (new flags, commands, behaviors, en
 
 ## Architecture
 
-- `cmd/agent-lark/` — entry point and root cobra command (`install.go` registers all subcommands)
+- `cmd/agent-lark/` — entry point and root cobra command (`main.go` registers all subcommands)
 - `internal/cmdutil/` — global flag resolution and shared pagination types
 - `internal/client/` — Feishu SDK client factory; resolves token mode and calls `auth.EnsureUserTokenValid`
 - `internal/auth/` — credential storage (`~/.agent-lark/profiles/<name>.json`), OAuth flow, token refresh

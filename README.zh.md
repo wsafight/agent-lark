@@ -18,7 +18,8 @@ mv agent-lark /usr/local/bin/   # 可选
 ## 快速开始
 
 ```bash
-agent-lark auth login           # 配置应用凭据（交互式）
+agent-lark init                 # 首次使用：安装 Skill + 配置凭据
+agent-lark setup                # 配置应用凭据（交互式向导）
 agent-lark auth oauth           # 追加 OAuth 用户授权（访问个人云盘等场景）
 agent-lark auth status          # 查看认证状态
 
@@ -33,8 +34,8 @@ agent-lark task list
 ### 应用凭据
 
 ```bash
-agent-lark auth login                                   # 交互式配置
-agent-lark auth login --app-id <ID> --app-secret <S>   # 非交互式
+agent-lark setup                                        # 交互式向导（自建应用）
+agent-lark auth login                                   # 快速登录（内置公共应用，仅特定构建可用）
 ```
 
 ### OAuth 用户授权
@@ -60,12 +61,11 @@ agent-lark auth set-mode user
 
 ### 多 Profile 管理
 
-适用于同时管理多个飞书应用或团队的场景。首次登录时会自动将当前目录绑定到 profile。
+适用于同时管理多个飞书应用或团队的场景。每个项目目录会根据路径自动分配隔离的 profile（基于 SHA-256 哈希）。
 
 ```bash
-agent-lark auth login --profile work
-agent-lark auth profile list
-agent-lark auth profile use work
+agent-lark setup --profile work       # 为指定 profile 配置凭据
+agent-lark auth profile list          # 列出所有 profile
 agent-lark --profile work docs list   # 临时指定 profile
 ```
 
@@ -98,12 +98,12 @@ agent-lark auth logout --all         # 清除全部凭据
 ### auth
 
 ```bash
-agent-lark auth login                                   # 配置应用凭据
+agent-lark setup                                        # 交互式凭据向导
+agent-lark auth login                                   # 快速登录（内置公共应用）
 agent-lark auth oauth                                   # 追加 OAuth 用户授权
 agent-lark auth status                                  # 查看认证状态
 agent-lark auth set-mode auto|tenant|user               # 修改默认 Token 模式
 agent-lark auth profile list                            # 列出所有 profile
-agent-lark auth profile use <name>                      # 绑定当前项目到 profile
 agent-lark auth logout --user                           # 清除用户 Token
 agent-lark auth logout --all                            # 全部重置
 ```
@@ -289,7 +289,7 @@ agent-lark template list
 
 agent-lark template save 周报 --file weekly.md
 agent-lark template save 周报 --file weekly.md --force   # 覆盖已有模板
-agent-lark template save 周报 --doc "<url>"              # 从飞书文档拉取
+agent-lark template save 周报 --from "<url>"             # 从飞书文档拉取
 
 agent-lark template get 周报
 agent-lark template vars 周报                            # 列出模板中使用的变量

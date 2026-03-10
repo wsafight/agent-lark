@@ -306,7 +306,7 @@ agent-lark perms list "$URL" --format json | \
   while read uid; do
     agent-lark perms update "$URL" --user "$uid" --role view --yes
   done
-agent-lark perms public "$URL" --link-share off --copy deny --yes
+agent-lark perms public "$URL" --link-share off --comment deny --yes
 ```
 
 ### Append a section to multiple documents

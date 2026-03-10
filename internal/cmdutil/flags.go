@@ -78,21 +78,20 @@ func ResolveGlobalFlags(cmd *cobra.Command) GlobalFlags {
 	return g
 }
 
-// ResolveTuple returns resolved global flags in tuple form for command handlers.
-func ResolveTuple(cmd *cobra.Command) (format, tokenMode, profile, config, domain string, debug, quiet, agent bool) {
-	g := ResolveGlobalFlags(cmd)
-	return g.Format, g.TokenMode, g.Profile, g.Config, g.Domain, g.Debug, g.Quiet, g.Agent
-}
-
-// NewClient creates a Feishu client from global flags, wrapping the error with CLIENT_ERROR code.
-func (g GlobalFlags) NewClient() (*client.Result, error) {
-	c, err := client.New(client.Options{
+// ClientOptions returns a client.Options populated from the global flags.
+func (g GlobalFlags) ClientOptions() client.Options {
+	return client.Options{
 		TokenMode: g.TokenMode,
 		Debug:     g.Debug,
 		Profile:   g.Profile,
 		Config:    g.Config,
 		Domain:    g.Domain,
-	})
+	}
+}
+
+// NewClient creates a Feishu client from global flags, wrapping the error with CLIENT_ERROR code.
+func (g GlobalFlags) NewClient() (*client.Result, error) {
+	c, err := client.New(g.ClientOptions())
 	if err != nil {
 		return nil, fmt.Errorf("CLIENT_ERROR：%s", err.Error())
 	}

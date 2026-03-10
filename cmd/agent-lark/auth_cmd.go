@@ -51,18 +51,12 @@ func newAuthPublicLoginCommand() *cobra.Command {
 			}
 			fmt.Println("✓ 公共应用凭据已配置")
 
-			cwd, err := os.Getwd()
-			if err != nil {
-				cwd = "."
-			}
-			projectRoot := detectProjectRoot(cwd)
-			effectiveProfile := resolveEffectiveProfile(g.Profile)
+			effectiveProfile := auth.ResolveEffectiveProfile(g.Profile)
 
 			if err := auth.OAuthLogin(appID, appSecret, oauthScope, g.Config, effectiveProfile, oauthCallbackPort); err != nil {
 				return fmt.Errorf("OAuth 登录失败：%w", err)
 			}
 
-			_ = saveProjectBinding(projectRoot, effectiveProfile)
 			fmt.Println("✓ 登录成功")
 			return nil
 		},
@@ -213,29 +207,7 @@ func newAuthProfileCommand() *cobra.Command {
 		},
 	}
 
-	useCmd := &cobra.Command{
-		Use:   "use <name>",
-		Short: "切换当前项目的 profile",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			profileName := args[0]
-
-			cwd, err := os.Getwd()
-			if err != nil {
-				cwd = "."
-			}
-			projectRoot := detectProjectRoot(cwd)
-
-			if err := saveProjectBinding(projectRoot, profileName); err != nil {
-				return fmt.Errorf("保存 profile 绑定失败：%w", err)
-			}
-
-			fmt.Printf("✓ 项目 %s 已绑定到 profile: %s\n", projectRoot, profileName)
-			return nil
-		},
-	}
-
-	cmd.AddCommand(listCmd, useCmd)
+	cmd.AddCommand(listCmd)
 	return cmd
 }
 

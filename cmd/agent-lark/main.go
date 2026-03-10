@@ -6,7 +6,6 @@ import (
 	"unicode"
 
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/auth"
 	"github.com/wsafight/agent-lark/internal/base"
 	"github.com/wsafight/agent-lark/internal/comments"
 	"github.com/wsafight/agent-lark/internal/contact"
@@ -27,10 +26,6 @@ func main() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			agentMode, _ := cmd.Root().PersistentFlags().GetBool("agent")
-			if agentMode {
-				output.GlobalAgent = true
-			}
 			// 跳过 upgrade/version 自身，避免重入或无意义检查
 			if name := cmd.Name(); name != "upgrade" && name != "version" {
 				StartBackgroundUpgrade()
@@ -65,8 +60,6 @@ func main() {
 		newUpgradeCommand(),
 		newVersionCommand(),
 	)
-
-	_ = auth.ProfilesDir() // ensure import
 
 	if err := root.Execute(); err != nil {
 		code, message := splitErrorCode(err)

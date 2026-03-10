@@ -70,10 +70,22 @@ func Load(explicitConfig, profile string) (*Config, string, error) {
 		)
 	}
 	if key, err := loadOrCreateMasterKey(); err == nil {
-		cfg.AppSecret, _ = decryptField(key, cfg.AppSecret)
+		if dec, e := decryptField(key, cfg.AppSecret); e == nil {
+			cfg.AppSecret = dec
+		} else {
+			fmt.Fprintln(os.Stderr, "⚠ AppSecret 解密失败，可能需要重新配置："+e.Error())
+		}
 		if cfg.UserSession != nil {
-			cfg.UserSession.UserAccessToken, _ = decryptField(key, cfg.UserSession.UserAccessToken)
-			cfg.UserSession.RefreshToken, _ = decryptField(key, cfg.UserSession.RefreshToken)
+			if dec, e := decryptField(key, cfg.UserSession.UserAccessToken); e == nil {
+				cfg.UserSession.UserAccessToken = dec
+			} else {
+				fmt.Fprintln(os.Stderr, "⚠ UserAccessToken 解密失败："+e.Error())
+			}
+			if dec, e := decryptField(key, cfg.UserSession.RefreshToken); e == nil {
+				cfg.UserSession.RefreshToken = dec
+			} else {
+				fmt.Fprintln(os.Stderr, "⚠ RefreshToken 解密失败："+e.Error())
+			}
 		}
 	}
 

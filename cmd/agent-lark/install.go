@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"crypto/sha256"
 	_ "embed"
 	"fmt"
 	"os"
@@ -16,12 +15,6 @@ import (
 
 //go:embed SKILL.md
 var skillMD []byte
-
-// projectHashProfile derives a stable profile name from the project root path.
-func projectHashProfile(projectRoot string) string {
-	sum := sha256.Sum256([]byte(projectRoot))
-	return fmt.Sprintf("project-%x", sum[:4])
-}
 
 func newInitCommand() *cobra.Command {
 	var skillDir string
@@ -37,9 +30,9 @@ func newInitCommand() *cobra.Command {
 			if err != nil {
 				cwd = "."
 			}
-			projectRoot := detectProjectRoot(cwd)
+			projectRoot := auth.DetectProjectRoot(cwd)
 			if g.Profile == "" {
-				g.Profile = projectHashProfile(projectRoot)
+				g.Profile = auth.ProjectHashProfile(projectRoot)
 			}
 
 			// ── 检测已有状态 ──────────────────────────────────────

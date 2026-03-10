@@ -6,7 +6,7 @@ You have access to the `agent-lark` CLI for interacting with Feishu/Lark. Use it
 
 The CLI follows a **stateless command pattern**: each call is fully self-contained. State (credentials, tokens) is persisted in `~/.agent-lark/profiles/<profile>.json` automatically.
 
-> **Full command reference** (for human readers): see [OPERATIONS.md](./OPERATIONS.md).
+> Full command reference is evolving with the CLI source; use `agent-lark --help` and `<subcommand> --help` for the latest flags.
 
 ---
 
@@ -43,7 +43,7 @@ done
 
 ## Authentication
 
-Before calling any Lark API, valid credentials are required. The CLI prompts automatically if missing — **you don't need to run login first**.
+Before calling any Lark API, valid credentials are required.
 
 ```bash
 agent-lark login          # Personal use: opens browser, no App ID needed
@@ -125,7 +125,7 @@ agent-lark im chats list [--limit 20]
 agent-lark im chats search "weekly sync"
 ```
 
-> `im messages get` is **not yet implemented** — use `im messages list` and filter by `message_id`.
+`im messages get <message_id>` is available for fetching a single message detail.
 
 ---
 
@@ -143,7 +143,7 @@ echo "## Section\nBody." | agent-lark docs update "<URL>" --stdin
 
 ```bash
 # Insert after a paragraph containing the given text
-agent-lark docs table "<URL>" --after "Q3 Summary" --rows 4 --cols 3 --headers "Metric,Target,Actual"
+agent-lark docs table "<URL>" --after "Q3 Summary" --rows 4 --cols 3 --headers
 
 # From CSV file
 agent-lark docs table "<URL>" --after "Data Overview" --data ./report.csv
@@ -160,7 +160,7 @@ If `--after` matches multiple paragraphs: re-run with `--format json` to get str
 agent-lark im send --chat-id <chat_id> --text "Hello"
 agent-lark im send --user-id <open_id> --text "Hi"       # auto-creates DM
 agent-lark im send --chat-id <chat_id> --card-file ./card.json
-agent-lark im react --message-id <msg_id> --emoji THUMBSUP
+agent-lark im react add --message-id <msg_id> --emoji THUMBSUP
 agent-lark im react remove --message-id <msg_id> --reaction-id <reaction_id>
 ```
 
@@ -177,7 +177,7 @@ agent-lark base records batch-create "<URL>" --file ./records.json
 ### Tasks
 
 ```bash
-agent-lark task list [--status todo|in_progress|done]
+agent-lark task list [--status todo|done]
 agent-lark task create --title "Review PR" --due "2024-12-31" [--assignee <open_id>]
 agent-lark task update --task-id <id> --status done
 ```
@@ -234,7 +234,7 @@ agent-lark perms update "<URL>" --user alice@company.com --role view [--yes]
 agent-lark perms remove "<URL>" --user alice@company.com [--yes]
 agent-lark perms transfer "<URL>" --to alice@company.com [--yes]   # irreversible
 agent-lark perms public "<URL>"                                     # view current settings
-agent-lark perms public "<URL>" --link-share tenant --copy deny [--yes]
+agent-lark perms public "<URL>" --link-share tenant --comment deny [--yes]
 ```
 
 Permission roles: `view` `edit` `full_access`
@@ -306,7 +306,7 @@ agent-lark perms list "$URL" --format json | \
   while read uid; do
     agent-lark perms update "$URL" --user "$uid" --role view --yes
   done
-agent-lark perms public "$URL" --link-share off --copy deny --yes
+agent-lark perms public "$URL" --link-share off --comment deny --yes
 ```
 
 ### Append a section to multiple documents

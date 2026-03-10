@@ -18,7 +18,8 @@ mv agent-lark /usr/local/bin/   # optional
 ## Quick Start
 
 ```bash
-agent-lark auth login           # Configure app credentials (interactive)
+agent-lark init                 # First-time setup: install Skill + configure credentials
+agent-lark setup                # Configure app credentials (interactive wizard)
 agent-lark auth oauth           # Add OAuth user token (for personal Drive access)
 agent-lark auth status          # Check auth status
 
@@ -33,8 +34,8 @@ agent-lark task list
 ### App credentials
 
 ```bash
-agent-lark auth login                                   # Interactive prompt
-agent-lark auth login --app-id <ID> --app-secret <S>   # Non-interactive
+agent-lark setup                                        # Interactive wizard (self-built apps)
+agent-lark auth login                                   # Quick login with built-in public app (special builds only)
 ```
 
 ### OAuth user token
@@ -60,12 +61,11 @@ agent-lark auth set-mode user
 
 ### Profiles
 
-Manage multiple apps or teams with named profiles. A project directory is automatically bound to a profile on first login.
+Manage multiple apps or teams with named profiles. Each project directory is automatically assigned an isolated profile based on its path (SHA-256 hash).
 
 ```bash
-agent-lark auth login --profile work
-agent-lark auth profile list
-agent-lark auth profile use work
+agent-lark setup --profile work       # Configure credentials for a named profile
+agent-lark auth profile list          # List all profiles
 agent-lark --profile work docs list   # One-off override
 ```
 
@@ -98,12 +98,12 @@ All flags can also be set via environment variables (explicit flag takes precede
 ### auth
 
 ```bash
-agent-lark auth login                                   # Configure app credentials
+agent-lark setup                                        # Interactive credential wizard
+agent-lark auth login                                   # Quick login (built-in public app)
 agent-lark auth oauth                                   # Authorize OAuth user token
 agent-lark auth status                                  # Show auth status
 agent-lark auth set-mode auto|tenant|user               # Set default token mode
 agent-lark auth profile list                            # List profiles
-agent-lark auth profile use <name>                      # Bind project to profile
 agent-lark auth logout --user                           # Clear user token
 agent-lark auth logout --all                            # Full reset
 ```
@@ -289,7 +289,7 @@ agent-lark template list
 
 agent-lark template save weekly --file weekly.md
 agent-lark template save weekly --file weekly.md --force   # Overwrite
-agent-lark template save weekly --doc "<url>"              # Pull from Feishu doc
+agent-lark template save weekly --from "<url>"             # Pull from Feishu doc
 
 agent-lark template get weekly
 agent-lark template vars weekly                            # List variables used

@@ -34,8 +34,7 @@ func newTemplateListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "列出所有本地模板",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, _, _, _, _, _, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			templates, err := ListAll()
 			if err != nil {
@@ -43,14 +42,14 @@ func newTemplateListCommand() *cobra.Command {
 			}
 
 			if len(templates) == 0 {
-				if format == "json" {
+				if g.Format == "json" {
 					return output.PrintJSON(os.Stdout, []any{})
 				}
 				fmt.Println("（无模板，运行 'agent-lark template save <名称>' 创建）")
 				return nil
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, templates)
 			}
 
@@ -78,8 +77,7 @@ func newTemplateSaveCommand() *cobra.Command {
 		Short: "保存模板",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			name := args[0]
 
@@ -88,13 +86,7 @@ func newTemplateSaveCommand() *cobra.Command {
 				fromURL,
 				filePath,
 				content,
-				client.Options{
-					TokenMode: tokenMode,
-					Debug:     debug,
-					Profile:   profile,
-					Config:    cfg,
-					Domain:    domain,
-				},
+				g.ClientOptions(),
 			)
 			if err != nil {
 				return err
@@ -180,15 +172,14 @@ func newTemplateGetCommand() *cobra.Command {
 		Short: "显示模板原始内容",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, _, _, _, _, _, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			t, err := Load(args[0])
 			if err != nil {
 				return err
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, t)
 			}
 
@@ -206,8 +197,7 @@ func newTemplateVarsCommand() *cobra.Command {
 		Short: "分析模板变量",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, _, _, _, _, _, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			t, err := Load(args[0])
 			if err != nil {
@@ -253,7 +243,7 @@ func newTemplateVarsCommand() *cobra.Command {
 				}
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, result)
 			}
 
@@ -294,13 +284,12 @@ func newTemplateDeleteCommand() *cobra.Command {
 		Short: "删除模板",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, _, _, _, _, _, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 			globalYes, _ := cmd.Root().PersistentFlags().GetBool("yes")
 
 			name := args[0]
 
-			if !yes && !globalYes && !output.GlobalAgent {
+			if !yes && !globalYes && !g.Agent {
 				fmt.Printf("确认删除模板 %q？[y/N]: ", name)
 				var input string
 				fmt.Scan(&input)
@@ -338,8 +327,7 @@ func newTemplateApplyCommand() *cobra.Command {
 		Short: "应用模板（创建新文档或追加到已有文档）",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
 			if !newDoc && targetURL == "" {
 				return fmt.Errorf("MISSING_FLAG：请提供 --new 或 --to <URL>")
@@ -362,13 +350,7 @@ func newTemplateApplyCommand() *cobra.Command {
 
 			// Get author name from config if available
 			authorName := ""
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := client.New(g.ClientOptions())
 			if err == nil && c.Cfg != nil && c.Cfg.UserSession != nil {
 				authorName = c.Cfg.UserSession.Name
 			}
@@ -384,14 +366,8 @@ func newTemplateApplyCommand() *cobra.Command {
 				MatchIndex:   matchIndex,
 				CustomVars:   customMap,
 				DryRun:       dryRun,
-				ClientOpts: client.Options{
-					TokenMode: tokenMode,
-					Debug:     debug,
-					Profile:   profile,
-					Config:    cfg,
-					Domain:    domain,
-				},
-				AuthorName: authorName,
+				ClientOpts:   g.ClientOptions(),
+				AuthorName:   authorName,
 			}
 
 			url, err := Apply(cmd.Context(), opts)
