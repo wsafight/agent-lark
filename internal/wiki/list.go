@@ -22,12 +22,7 @@ func newListCommand() *cobra.Command {
 		Short: "列举知识空间节点",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, tokenMode, profile, cfg, domain, debug, quiet, agent := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			spaceToken := ExtractWikiToken(args[0])
@@ -47,12 +42,12 @@ func newListCommand() *cobra.Command {
 			}
 
 			type NodeItem struct {
-				NodeToken  string `json:"node_token"`
-				ObjToken   string `json:"obj_token"`
-				ObjType    string `json:"obj_type"`
-				Title      string `json:"title"`
-				HasChild   bool   `json:"has_child"`
-				Depth      int    `json:"depth"`
+				NodeToken string `json:"node_token"`
+				ObjToken  string `json:"obj_token"`
+				ObjType   string `json:"obj_type"`
+				Title     string `json:"title"`
+				HasChild  bool   `json:"has_child"`
+				Depth     int    `json:"depth"`
 			}
 
 			var items []NodeItem
@@ -167,12 +162,4 @@ func newListCommand() *cobra.Command {
 }
 
 // PagedResponse is used for agent mode paged responses.
-type PagedResponse struct {
-	Items      any    `json:"items"`
-	NextCursor string `json:"next_cursor"`
-}
-
-func getGlobalFlags(cmd *cobra.Command) (format, tokenMode, profile, config, domain string, debug, quiet, agent bool) {
-	g := cmdutil.GetGlobalFlags(cmd)
-	return g.Format, g.TokenMode, g.Profile, g.Config, g.Domain, g.Debug, g.Quiet, g.Agent
-}
+type PagedResponse = cmdutil.PagedResponse

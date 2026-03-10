@@ -8,6 +8,7 @@ import (
 	larkcontact "github.com/larksuite/oapi-sdk-go/v3/service/contact/v3"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -24,12 +25,7 @@ func newSearchCommand() *cobra.Command {
 		Short: "通过邮箱查询用户",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			query := args[0]

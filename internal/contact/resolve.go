@@ -7,7 +7,7 @@ import (
 	larkcontact "github.com/larksuite/oapi-sdk-go/v3/service/contact/v3"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
-	"github.com/wsafight/agent-lark/internal/output"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 )
 
 func newResolveCommand() *cobra.Command {
@@ -16,10 +16,7 @@ func newResolveCommand() *cobra.Command {
 		Short: "通过邮箱解析 open_id",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-			}
+			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			input := args[0]

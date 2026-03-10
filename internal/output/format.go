@@ -56,57 +56,59 @@ func PrintSuccess(quiet bool, msg string) {
 	}
 }
 
+// Block type constants for Feishu docx blocks.
+const (
+	BlockTypePage        = 1
+	BlockTypeText        = 2
+	BlockTypeHeading1    = 3
+	BlockTypeHeading2    = 4
+	BlockTypeHeading3    = 5
+	BlockTypeHeading4    = 6
+	BlockTypeHeading5    = 7
+	BlockTypeHeading6    = 8
+	BlockTypeOrderedList = 9
+	BlockTypeBulletList  = 10
+	BlockTypeCode        = 11
+	BlockTypeQuote       = 12
+	BlockTypeDivider     = 19
+)
+
 // BlocksToMarkdown 将飞书文档 Block 列表转换为 Markdown 字符串。
 func BlocksToMarkdown(blocks []*BlockItem) string {
 	var sb strings.Builder
+	orderedCounter := 0
 	for _, b := range blocks {
+		if b.BlockType != BlockTypeOrderedList {
+			orderedCounter = 0
+		}
 		switch b.BlockType {
-		case 1: // page/root
-			// skip
-		case 2: // text
+		case BlockTypePage: // skip root block
+		case BlockTypeText:
 			sb.WriteString(b.TextContent())
 			sb.WriteString("\n")
-		case 3: // heading1
-			sb.WriteString("# ")
+		case BlockTypeHeading1, BlockTypeHeading2, BlockTypeHeading3,
+			BlockTypeHeading4, BlockTypeHeading5, BlockTypeHeading6:
+			level := b.BlockType - BlockTypeHeading1 + 1
+			sb.WriteString(strings.Repeat("#", level))
+			sb.WriteString(" ")
 			sb.WriteString(b.TextContent())
 			sb.WriteString("\n")
-		case 4: // heading2
-			sb.WriteString("## ")
-			sb.WriteString(b.TextContent())
-			sb.WriteString("\n")
-		case 5: // heading3
-			sb.WriteString("### ")
-			sb.WriteString(b.TextContent())
-			sb.WriteString("\n")
-		case 6: // heading4
-			sb.WriteString("#### ")
-			sb.WriteString(b.TextContent())
-			sb.WriteString("\n")
-		case 7: // heading5
-			sb.WriteString("##### ")
-			sb.WriteString(b.TextContent())
-			sb.WriteString("\n")
-		case 8: // heading6
-			sb.WriteString("###### ")
-			sb.WriteString(b.TextContent())
-			sb.WriteString("\n")
-		case 9: // ordered_list
-			sb.WriteString("1. ")
-			sb.WriteString(b.TextContent())
-			sb.WriteString("\n")
-		case 10: // bullet_list
+		case BlockTypeOrderedList:
+			orderedCounter++
+			fmt.Fprintf(&sb, "%d. %s\n", orderedCounter, b.TextContent())
+		case BlockTypeBulletList:
 			sb.WriteString("- ")
 			sb.WriteString(b.TextContent())
 			sb.WriteString("\n")
-		case 11: // code
+		case BlockTypeCode:
 			sb.WriteString("```\n")
 			sb.WriteString(b.TextContent())
 			sb.WriteString("\n```\n")
-		case 12: // quote
+		case BlockTypeQuote:
 			sb.WriteString("> ")
 			sb.WriteString(b.TextContent())
 			sb.WriteString("\n")
-		case 19: // divider
+		case BlockTypeDivider:
 			sb.WriteString("---\n")
 		default:
 			text := b.TextContent()

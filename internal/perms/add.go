@@ -9,6 +9,7 @@ import (
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -23,12 +24,7 @@ func newAddCommand() *cobra.Command {
 		Short: "添加协作者",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			if len(users) == 0 {

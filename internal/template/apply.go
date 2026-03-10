@@ -32,10 +32,18 @@ type ApplyOptions struct {
 }
 
 // Apply 执行模板应用（创建新文档或追加到已有文档）。
-func Apply(opts ApplyOptions) (string, error) {
+func Apply(ctx context.Context, opts ApplyOptions) (string, error) {
 	t, err := Load(opts.TemplateName)
 	if err != nil {
 		return "", err
+	}
+
+	docToken := ""
+	if !opts.New {
+		docToken = docs.ExtractDocID(opts.TargetURL)
+		if strings.TrimSpace(docToken) == "" {
+			return "", fmt.Errorf("INVALID_URL：无法解析目标文档 token")
+		}
 	}
 
 	// 合并变量
@@ -69,7 +77,7 @@ func Apply(opts ApplyOptions) (string, error) {
 			bodyBuilder = bodyBuilder.FolderToken(folderToken)
 		}
 		createResp, err := res.Client.Docx.Document.Create(
-			context.Background(),
+			ctx,
 			larkdocx.NewCreateDocumentReqBuilder().Body(bodyBuilder.Build()).Build(),
 			res.RequestOptions()...,
 		)
@@ -81,7 +89,7 @@ func Apply(opts ApplyOptions) (string, error) {
 		}
 		docToken := *createResp.Data.Document.DocumentId
 		// 追加内容
-		if err := appendContent(res, docToken, content, "", "", 0); err != nil {
+		if err := appendContent(ctx, res, docToken, content, "", "", 0); err != nil {
 			return "", err
 		}
 		domain := "feishu.cn"
@@ -92,15 +100,14 @@ func Apply(opts ApplyOptions) (string, error) {
 	}
 
 	// 追加到已有文档
-	docToken := docs.ExtractDocID(opts.TargetURL)
-	if err := appendContent(res, docToken, content, opts.After, opts.Before, opts.MatchIndex); err != nil {
+	if err := appendContent(ctx, res, docToken, content, opts.After, opts.Before, opts.MatchIndex); err != nil {
 		return "", err
 	}
 	return opts.TargetURL, nil
 }
 
-func appendContent(res *client.Result, docToken, content, after, before string, matchIndex int) error {
-	insertIndex, err := resolveInsertIndex(res, docToken, after, before, matchIndex)
+func appendContent(ctx context.Context, res *client.Result, docToken, content, after, before string, matchIndex int) error {
+	insertIndex, err := resolveInsertIndex(ctx, res, docToken, after, before, matchIndex)
 	if err != nil {
 		return err
 	}
@@ -118,7 +125,7 @@ func appendContent(res *client.Result, docToken, content, after, before string, 
 			Index(insertIndex).
 			Build()).
 		Build()
-	resp, err := res.Client.Docx.DocumentBlockChildren.Create(context.Background(), req, res.RequestOptions()...)
+	resp, err := res.Client.Docx.DocumentBlockChildren.Create(ctx, req, res.RequestOptions()...)
 	if err != nil {
 		return fmt.Errorf("追加内容失败：%w", err)
 	}
@@ -128,7 +135,7 @@ func appendContent(res *client.Result, docToken, content, after, before string, 
 	return nil
 }
 
-func resolveInsertIndex(res *client.Result, docToken, after, before string, matchIndex int) (int, error) {
+func resolveInsertIndex(ctx context.Context, res *client.Result, docToken, after, before string, matchIndex int) (int, error) {
 	if after == "" && before == "" {
 		return -1, nil
 	}
@@ -148,7 +155,7 @@ func resolveInsertIndex(res *client.Result, docToken, after, before string, matc
 		return -1, nil
 	}
 
-	blocks, err := docxutil.FetchAllBlocks(context.Background(), res, docToken)
+	blocks, err := docxutil.FetchAllBlocks(ctx, res, docToken)
 	if err != nil {
 		return 0, err
 	}

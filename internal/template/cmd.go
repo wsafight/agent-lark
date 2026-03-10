@@ -7,18 +7,13 @@ import (
 	"strings"
 	"time"
 
-	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
 	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/docs"
+	"github.com/wsafight/agent-lark/internal/docxutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
-
-func getGlobalFlags(cmd *cobra.Command) (format, tokenMode, profile, config, domain string, debug, quiet, agent bool) {
-	g := cmdutil.GetGlobalFlags(cmd)
-	return g.Format, g.TokenMode, g.Profile, g.Config, g.Domain, g.Debug, g.Quiet, g.Agent
-}
 
 // NewCommand returns the template subcommand group.
 func NewCommand() *cobra.Command {
@@ -39,12 +34,7 @@ func newTemplateListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "列出所有本地模板",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, _, _, _, _, _, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, _, _, _, _, _, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			templates, err := ListAll()
@@ -88,141 +78,26 @@ func newTemplateSaveCommand() *cobra.Command {
 		Short: "保存模板",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-			}
+			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			name := args[0]
 
-			var tmplContent string
-			var source string
-
-			switch {
-			case fromURL != "":
-				// Fetch from Feishu doc
-				source = fromURL
-				docToken := docs.ExtractDocID(fromURL)
-				if docToken == "" {
-					return fmt.Errorf("INVALID_URL：无法解析文档 token")
-				}
-
-				c, err := client.New(client.Options{
+			tmplContent, source, err := resolveTemplateSource(
+				cmd.Context(),
+				fromURL,
+				filePath,
+				content,
+				client.Options{
 					TokenMode: tokenMode,
 					Debug:     debug,
 					Profile:   profile,
 					Config:    cfg,
 					Domain:    domain,
-				})
-				if err != nil {
-					return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
-				}
-
-				// Get document metadata (title)
-				docResp, err := c.Client.Docx.Document.Get(
-					context.Background(),
-					larkdocx.NewGetDocumentReqBuilder().DocumentId(docToken).Build(),
-					c.RequestOptions()...,
-				)
-				if err != nil {
-					return fmt.Errorf("API_ERROR：%s", err.Error())
-				}
-				if !docResp.Success() {
-					return fmt.Errorf("API_ERROR：[%d] %s", docResp.Code, docResp.Msg)
-				}
-
-				// Get all blocks
-				var allBlocks []*larkdocx.Block
-				var pageToken string
-				for {
-					builder := larkdocx.NewListDocumentBlockReqBuilder().
-						DocumentId(docToken).
-						PageSize(200)
-					if pageToken != "" {
-						builder = builder.PageToken(pageToken)
-					}
-					resp, err := c.Client.Docx.DocumentBlock.List(
-						context.Background(),
-						builder.Build(),
-						c.RequestOptions()...,
-					)
-					if err != nil {
-						return fmt.Errorf("API_ERROR：%s", err.Error())
-					}
-					if !resp.Success() {
-						return fmt.Errorf("API_ERROR：[%d] %s", resp.Code, resp.Msg)
-					}
-					allBlocks = append(allBlocks, resp.Data.Items...)
-					hasMore := resp.Data.HasMore != nil && *resp.Data.HasMore
-					if !hasMore {
-						break
-					}
-					if resp.Data.PageToken == nil || *resp.Data.PageToken == "" {
-						break
-					}
-					pageToken = *resp.Data.PageToken
-				}
-
-				// Convert blocks to markdown
-				var sb strings.Builder
-				for _, b := range allBlocks {
-					if b == nil || b.BlockType == nil {
-						continue
-					}
-					text := extractBlockText(b)
-					switch *b.BlockType {
-					case 1: // page
-						// skip
-					case 2:
-						if text != "" {
-							sb.WriteString(text)
-							sb.WriteString("\n\n")
-						}
-					case 3:
-						sb.WriteString("# " + text + "\n\n")
-					case 4:
-						sb.WriteString("## " + text + "\n\n")
-					case 5:
-						sb.WriteString("### " + text + "\n\n")
-					case 6:
-						sb.WriteString("#### " + text + "\n\n")
-					case 7:
-						sb.WriteString("##### " + text + "\n\n")
-					case 8:
-						sb.WriteString("###### " + text + "\n\n")
-					case 9:
-						sb.WriteString("1. " + text + "\n")
-					case 10:
-						sb.WriteString("- " + text + "\n")
-					case 11:
-						sb.WriteString("```\n" + text + "\n```\n\n")
-					case 12:
-						sb.WriteString("> " + text + "\n\n")
-					case 19:
-						sb.WriteString("---\n\n")
-					default:
-						if text != "" {
-							sb.WriteString(text + "\n\n")
-						}
-					}
-				}
-				tmplContent = strings.TrimSpace(sb.String())
-
-			case filePath != "":
-				source = "local"
-				data, err := os.ReadFile(filePath)
-				if err != nil {
-					return fmt.Errorf("读取文件失败：%w", err)
-				}
-				tmplContent = string(data)
-
-			case content != "":
-				source = "local"
-				tmplContent = content
-
-			default:
-				return fmt.Errorf("MISSING_FLAG：请提供 --file、--from 或 --content")
+				},
+			)
+			if err != nil {
+				return err
 			}
 
 			now := time.Now()
@@ -259,66 +134,44 @@ func newTemplateSaveCommand() *cobra.Command {
 	return cmd
 }
 
-func extractBlockText(b *larkdocx.Block) string {
-	if b == nil || b.BlockType == nil {
-		return ""
+func resolveTemplateSource(ctx context.Context, fromURL, filePath, inlineContent string, opts client.Options) (content, source string, err error) {
+	switch {
+	case fromURL != "":
+		markdown, err := fetchTemplateFromDoc(ctx, fromURL, opts)
+		if err != nil {
+			return "", "", err
+		}
+		return markdown, fromURL, nil
+	case filePath != "":
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return "", "", fmt.Errorf("读取文件失败：%w", err)
+		}
+		return string(data), "local", nil
+	case inlineContent != "":
+		return inlineContent, "local", nil
+	default:
+		return "", "", fmt.Errorf("MISSING_FLAG：请提供 --file、--from 或 --content")
 	}
-	extractFromElements := func(elements []*larkdocx.TextElement) string {
-		var sb strings.Builder
-		for _, el := range elements {
-			if el != nil && el.TextRun != nil && el.TextRun.Content != nil {
-				sb.WriteString(*el.TextRun.Content)
-			}
-		}
-		return sb.String()
+}
+
+func fetchTemplateFromDoc(ctx context.Context, fromURL string, opts client.Options) (string, error) {
+	docToken := docs.ExtractDocID(fromURL)
+	if docToken == "" {
+		return "", fmt.Errorf("INVALID_URL：无法解析文档 token")
 	}
-	switch *b.BlockType {
-	case 2:
-		if b.Text != nil {
-			return extractFromElements(b.Text.Elements)
-		}
-	case 3:
-		if b.Heading1 != nil {
-			return extractFromElements(b.Heading1.Elements)
-		}
-	case 4:
-		if b.Heading2 != nil {
-			return extractFromElements(b.Heading2.Elements)
-		}
-	case 5:
-		if b.Heading3 != nil {
-			return extractFromElements(b.Heading3.Elements)
-		}
-	case 6:
-		if b.Heading4 != nil {
-			return extractFromElements(b.Heading4.Elements)
-		}
-	case 7:
-		if b.Heading5 != nil {
-			return extractFromElements(b.Heading5.Elements)
-		}
-	case 8:
-		if b.Heading6 != nil {
-			return extractFromElements(b.Heading6.Elements)
-		}
-	case 9:
-		if b.Ordered != nil {
-			return extractFromElements(b.Ordered.Elements)
-		}
-	case 10:
-		if b.Bullet != nil {
-			return extractFromElements(b.Bullet.Elements)
-		}
-	case 11:
-		if b.Code != nil {
-			return extractFromElements(b.Code.Elements)
-		}
-	case 12:
-		if b.Quote != nil {
-			return extractFromElements(b.Quote.Elements)
-		}
+
+	c, err := client.New(opts)
+	if err != nil {
+		return "", fmt.Errorf("CLIENT_ERROR：%s", err.Error())
 	}
-	return ""
+
+	blocks, err := docxutil.FetchAllBlocks(ctx, c, docToken)
+	if err != nil {
+		return "", err
+	}
+	outBlocks := docxutil.ConvertBlocks(blocks)
+	return strings.TrimSpace(output.BlocksToMarkdown(outBlocks)), nil
 }
 
 func newTemplateGetCommand() *cobra.Command {
@@ -327,12 +180,7 @@ func newTemplateGetCommand() *cobra.Command {
 		Short: "显示模板原始内容",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, _, _, _, _, _, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, _, _, _, _, _, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			t, err := Load(args[0])
@@ -358,12 +206,7 @@ func newTemplateVarsCommand() *cobra.Command {
 		Short: "分析模板变量",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, _, _, _, _, _, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, _, _, _, _, _, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			t, err := Load(args[0])
@@ -451,10 +294,7 @@ func newTemplateDeleteCommand() *cobra.Command {
 		Short: "删除模板",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, _, _, _, _, _, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-			}
+			_, _, _, _, _, _, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 			globalYes, _ := cmd.Root().PersistentFlags().GetBool("yes")
 
@@ -498,10 +338,7 @@ func newTemplateApplyCommand() *cobra.Command {
 		Short: "应用模板（创建新文档或追加到已有文档）",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-			}
+			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			if !newDoc && targetURL == "" {
@@ -557,7 +394,7 @@ func newTemplateApplyCommand() *cobra.Command {
 				AuthorName: authorName,
 			}
 
-			url, err := Apply(opts)
+			url, err := Apply(cmd.Context(), opts)
 			if err != nil {
 				return err
 			}

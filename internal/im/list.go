@@ -7,6 +7,7 @@ import (
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -21,12 +22,7 @@ func newMessagesListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "列举消息",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, tokenMode, profile, cfg, domain, debug, quiet, agent := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			if chatID == "" {

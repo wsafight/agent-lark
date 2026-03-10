@@ -7,6 +7,7 @@ import (
 	larktask "github.com/larksuite/oapi-sdk-go/v3/service/task/v2"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -22,17 +23,13 @@ func newListCommand() *cobra.Command {
 	var assignee string
 	var status string
 	var limit int
+	var cursor string
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "列举任务",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, tokenMode, profile, cfg, domain, debug, quiet, agent := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			normalizedStatus, err := normalizeTaskStatus(status)
@@ -52,16 +49,17 @@ func newListCommand() *cobra.Command {
 				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
 			}
 
-			pageSize := limit
-			if pageSize <= 0 || pageSize > 100 {
-				pageSize = 100
-			}
 			if limit <= 0 {
 				limit = 20
 			}
+			pageSize := limit
+			if pageSize > 100 {
+				pageSize = 100
+			}
 
 			var items []taskItem
-			pageToken := ""
+			var nextToken string
+			pageToken := cursor
 			for {
 				reqBuilder := larktask.NewListTaskReqBuilder().
 					PageSize(pageSize).
@@ -116,9 +114,6 @@ func newListCommand() *cobra.Command {
 					if assignee != "" && item.AssigneeID != assignee {
 						continue
 					}
-					if status != "" && item.Status != status {
-						continue
-					}
 
 					items = append(items, item)
 					if len(items) >= limit {
@@ -126,13 +121,17 @@ func newListCommand() *cobra.Command {
 					}
 				}
 
-				if len(items) >= limit {
-					break
-				}
 				hasMore := resp.Data.HasMore != nil && *resp.Data.HasMore
 				nextPage := ""
 				if resp.Data.PageToken != nil {
 					nextPage = *resp.Data.PageToken
+				}
+
+				if len(items) >= limit {
+					if hasMore && nextPage != "" {
+						nextToken = nextPage
+					}
+					break
 				}
 				if !hasMore || nextPage == "" {
 					break
@@ -141,6 +140,9 @@ func newListCommand() *cobra.Command {
 			}
 
 			if format == "json" {
+				if agent {
+					return output.PrintJSON(os.Stdout, PagedResponse{Items: items, NextCursor: nextToken})
+				}
 				return output.PrintJSON(os.Stdout, items)
 			}
 
@@ -158,5 +160,6 @@ func newListCommand() *cobra.Command {
 	cmd.Flags().StringVar(&assignee, "assignee", "", "负责人 open_id")
 	cmd.Flags().StringVar(&status, "status", "", "任务状态：todo|done")
 	cmd.Flags().IntVar(&limit, "limit", 20, "返回数量限制")
+	cmd.Flags().StringVar(&cursor, "cursor", "", "分页游标")
 	return cmd
 }

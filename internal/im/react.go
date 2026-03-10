@@ -6,6 +6,7 @@ import (
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -17,10 +18,7 @@ func newReactAddCommand() *cobra.Command {
 		Use:   "add",
 		Short: "添加表情回复",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-			}
+			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 
 			if messageID == "" {
 				return fmt.Errorf("MISSING_FLAG：--message-id 是必填项")
@@ -88,10 +86,7 @@ func newReactRemoveCommand() *cobra.Command {
 		Use:   "remove",
 		Short: "删除表情回复",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-			}
+			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 
 			if messageID == "" {
 				return fmt.Errorf("MISSING_FLAG：--message-id 是必填项")

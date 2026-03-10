@@ -6,7 +6,7 @@ import (
 
 	larkbitable "github.com/larksuite/oapi-sdk-go/v3/service/bitable/v1"
 	"github.com/spf13/cobra"
-	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -16,32 +16,17 @@ func newRecordsGetCommand() *cobra.Command {
 		Short: "获取单条记录",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
-			_ = quiet
+			g := cmdutil.ResolveGlobalFlags(cmd)
 
-			appToken, tableID := ParseBitableURL(args[0])
-			if appToken == "" {
-				return fmt.Errorf("INVALID_URL：无法解析多维表格 URL")
-			}
-			if tableID == "" {
-				return fmt.Errorf("INVALID_URL：URL 中缺少 table 参数")
+			appToken, tableID, err := parseBitableURLStrict(args[0])
+			if err != nil {
+				return err
 			}
 			recordID := args[1]
 
-			c, err := client.New(client.Options{
-				TokenMode: tokenMode,
-				Debug:     debug,
-				Profile:   profile,
-				Config:    cfg,
-				Domain:    domain,
-			})
+			c, err := g.NewClient()
 			if err != nil {
-				return fmt.Errorf("CLIENT_ERROR：%s", err.Error())
+				return err
 			}
 
 			req := larkbitable.NewGetAppTableRecordReqBuilder().
@@ -73,7 +58,7 @@ func newRecordsGetCommand() *cobra.Command {
 				}
 			}
 
-			if format == "json" {
+			if g.Format == "json" {
 				return output.PrintJSON(os.Stdout, item)
 			}
 

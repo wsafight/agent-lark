@@ -10,6 +10,7 @@ import (
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -23,10 +24,7 @@ func newUpdateCommand() *cobra.Command {
 		Short: "向文档追加内容",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-			}
+			_, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 
 			docToken := ExtractDocID(args[0])
 			if docToken == "" {
@@ -93,8 +91,8 @@ func newUpdateCommand() *cobra.Command {
 
 			if output.GlobalAgent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]any{
-					"document_id":      docToken,
-					"appended_blocks":  len(children),
+					"document_id":     docToken,
+					"appended_blocks": len(children),
 				})
 			}
 
@@ -140,11 +138,9 @@ func buildParagraphBlocks(paragraphs []string) []*larkdocx.Block {
 	var blocks []*larkdocx.Block
 	for _, p := range paragraphs {
 		blockType := 2 // text paragraph
-		content := p
 
-		textRunContent := content
 		textRun := larkdocx.NewTextRunBuilder().
-			Content(textRunContent).
+			Content(p).
 			Build()
 
 		element := larkdocx.NewTextElementBuilder().

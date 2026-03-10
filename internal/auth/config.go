@@ -69,15 +69,38 @@ func Load(explicitConfig, profile string) (*Config, string, error) {
 			backupPath, err,
 		)
 	}
+	if key, err := loadOrCreateMasterKey(); err == nil {
+		cfg.AppSecret, _ = decryptField(key, cfg.AppSecret)
+		if cfg.UserSession != nil {
+			cfg.UserSession.UserAccessToken, _ = decryptField(key, cfg.UserSession.UserAccessToken)
+			cfg.UserSession.RefreshToken, _ = decryptField(key, cfg.UserSession.RefreshToken)
+		}
+	}
+
 	return &cfg, path, nil
 }
 
 func Save(cfg *Config, explicitConfig, profile string) error {
+	toSave := *cfg
+
+	key, err := loadOrCreateMasterKey()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "⚠ 无法初始化加密密钥，凭据以明文存储："+err.Error())
+	} else {
+		toSave.AppSecret, _ = encryptField(key, cfg.AppSecret)
+		if cfg.UserSession != nil {
+			sess := *cfg.UserSession
+			sess.UserAccessToken, _ = encryptField(key, cfg.UserSession.UserAccessToken)
+			sess.RefreshToken, _ = encryptField(key, cfg.UserSession.RefreshToken)
+			toSave.UserSession = &sess
+		}
+	}
+
 	path := ResolveConfigPath(explicitConfig, profile)
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	data, err := json.MarshalIndent(toSave, "", "  ")
 	if err != nil {
 		return err
 	}

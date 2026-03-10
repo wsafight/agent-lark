@@ -1,12 +1,14 @@
 package im
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
@@ -21,10 +23,7 @@ func newSendCommand() *cobra.Command {
 		Use:   "send",
 		Short: "发送消息",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-			}
+			_, tokenMode, profile, cfg, domain, debug, quiet, agent := cmdutil.ResolveTuple(cmd)
 
 			c, err := client.New(client.Options{
 				TokenMode: tokenMode,
@@ -89,7 +88,8 @@ func newSendCommand() *cobra.Command {
 				msgContent = cardJSON
 			} else if text != "" {
 				msgType = "text"
-				msgContent = fmt.Sprintf(`{"text":"%s"}`, escapeJSON(text))
+				b, _ := json.Marshal(map[string]string{"text": text})
+				msgContent = string(b)
 			} else {
 				return fmt.Errorf("MISSING_CONTENT：需要 --text、--card-file 或 --card 之一")
 			}
@@ -120,7 +120,7 @@ func newSendCommand() *cobra.Command {
 
 			output.PrintSuccess(quiet, fmt.Sprintf("消息已发送，message_id: %s", messageID))
 
-			if output.GlobalAgent {
+			if agent {
 				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{
 					"message_id": messageID,
 					"chat_id":    receiveID,
@@ -140,24 +140,3 @@ func newSendCommand() *cobra.Command {
 	return cmd
 }
 
-func escapeJSON(s string) string {
-	result := make([]byte, 0, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch c {
-		case '"':
-			result = append(result, '\\', '"')
-		case '\\':
-			result = append(result, '\\', '\\')
-		case '\n':
-			result = append(result, '\\', 'n')
-		case '\r':
-			result = append(result, '\\', 'r')
-		case '\t':
-			result = append(result, '\\', 't')
-		default:
-			result = append(result, c)
-		}
-	}
-	return string(result)
-}

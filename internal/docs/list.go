@@ -24,12 +24,7 @@ func newListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "列举文档",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, tokenMode, profile, cfg, domain, debug, quiet, agent := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			c, err := client.New(client.Options{
@@ -188,12 +183,4 @@ func parseSince(since string) (time.Time, error) {
 }
 
 // PagedResponse is used for agent mode paged responses.
-type PagedResponse struct {
-	Items      any    `json:"items"`
-	NextCursor string `json:"next_cursor"`
-}
-
-func getGlobalFlags(cmd *cobra.Command) (format, tokenMode, profile, config, domain string, debug, quiet, agent bool) {
-	g := cmdutil.GetGlobalFlags(cmd)
-	return g.Format, g.TokenMode, g.Profile, g.Config, g.Domain, g.Debug, g.Quiet, g.Agent
-}
+type PagedResponse = cmdutil.PagedResponse

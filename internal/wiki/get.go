@@ -8,22 +8,21 @@ import (
 	larkwiki "github.com/larksuite/oapi-sdk-go/v3/service/wiki/v2"
 	"github.com/spf13/cobra"
 	"github.com/wsafight/agent-lark/internal/client"
+	"github.com/wsafight/agent-lark/internal/cmdutil"
 	"github.com/wsafight/agent-lark/internal/docxutil"
 	"github.com/wsafight/agent-lark/internal/output"
 )
 
 func newGetCommand() *cobra.Command {
+	var contentBoundaries bool
+	var maxChars int
+
 	cmd := &cobra.Command{
 		Use:   "get <wiki-url-or-token>",
 		Short: "获取知识库页面内容",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, tokenMode, profile, cfg, domain, debug, quiet, agent := getGlobalFlags(cmd)
-			if agent {
-				output.GlobalAgent = true
-				format = "json"
-			}
-			format = output.FormatFromCmd(format)
+			format, tokenMode, profile, cfg, domain, debug, quiet, _ := cmdutil.ResolveTuple(cmd)
 			_ = quiet
 
 			wikiToken := ExtractWikiToken(args[0])
@@ -126,10 +125,19 @@ func newGetCommand() *cobra.Command {
 
 			// Default: markdown
 			md := output.BlocksToMarkdown(outBlocks)
-			fmt.Print(md)
+			if maxChars > 0 && len(md) > maxChars {
+				md = md[:maxChars] + "\n…[已截断]"
+			}
+			if contentBoundaries {
+				fmt.Printf("<document source=\"feishu://wiki/%s\">\n%s\n</document>\n", objToken, md)
+			} else {
+				fmt.Print(md)
+			}
 			return nil
 		},
 	}
 
+	cmd.Flags().BoolVar(&contentBoundaries, "content-boundaries", false, "用 <document> 标签包裹输出，防止提示注入")
+	cmd.Flags().IntVar(&maxChars, "max-chars", 0, "截断输出，最多输出 N 个字符（0 表示不限制）")
 	return cmd
 }
